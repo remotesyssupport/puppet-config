@@ -1,0 +1,9 @@
+for intf in vmnet0 vmnet8; do
+    if [ -e /dev/$intf ]; then
+	$IPTABLES -A INPUT   -i $intf -j ACCEPT 
+	$IPTABLES -A FORWARD -i $intf -j ACCEPT
+	$IPTABLES -A FORWARD -o $intf -j ACCEPT
+
+	$IPTABLES -t nat -A POSTROUTING -o $intf -j MASQUERADE
+    fi
+done

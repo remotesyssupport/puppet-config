@@ -1,0 +1,49 @@
+# Which local IP address should OpenVPN listen on?
+local 208.70.150.153
+port 1194
+proto udp 
+
+# direct these to your generated files 
+cd /etc/openvpn
+
+ca keys/ca.crt
+cert keys/server_axis_vps.crt
+key keys/server_axis_vps.key
+dh keys/dh2048.pem
+tls-auth keys/ta.key 0
+cipher AES-128-CBC
+
+# ensure the range of ip addresses you use in the last two arguments
+# of this statement are not in use by either the DHCP server or any
+# other device on your internal network.
+dev tun0
+server 172.19.0.0 255.255.255.0
+push "route 10.100.2.0 255.255.255.0"
+push "route 10.100.4.0 255.255.255.0"
+push "route 10.100.6.0 255.255.255.0"
+
+# needed to allow communication to internal network 
+client-to-client 
+keepalive 10 120 
+
+# compression for network speed 
+comp-lzo 
+fragment 1300 
+mssfix 1300 
+
+# some secuurity settings do not use if running server on Windows
+user nobody 
+group nobody 
+
+persist-key 
+persist-tun 
+ifconfig-pool-persist /var/run/openvpn/ipp.txt 
+
+# log file settings 
+status /var/log/openvpn/status.log 
+verb 3 
+
+chroot /var/run/openvpn
+mlock
+
+crl-verify /etc/openvpn/keys/crl.pem

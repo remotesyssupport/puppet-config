@@ -1,0 +1,7 @@
+for intf in tun+ tap+ br0 $PRIVINTF; do
+    $IPTABLES -A INPUT   -i $intf -j ACCEPT 
+    $IPTABLES -A FORWARD -i $intf -j ACCEPT
+    $IPTABLES -A FORWARD -o $intf -j ACCEPT
+done
+
+$IPTABLES -t nat -A POSTROUTING -o $PUBINTF -j MASQUERADE

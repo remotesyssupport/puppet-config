@@ -1,0 +1,24 @@
+module nagios-ext 1.0;
+
+require {
+        type nagios_t;
+        type initrc_var_run_t;
+        type var_t;
+        type sbin_t;
+        type ping_t;
+        type tmp_t;
+
+        class dir { read write add_name remove_name search };
+        class file { execute unlink create read write rename setattr getattr ioctl };
+        class fifo_file { read write create getattr };
+}
+
+allow nagios_t sbin_t:dir search;
+allow nagios_t initrc_var_run_t:file write;
+allow nagios_t tmp_t:file { read write ioctl };
+
+allow nagios_t var_t:dir { read write add_name remove_name };
+allow nagios_t var_t:file { execute unlink create read write rename setattr getattr };
+allow nagios_t var_t:fifo_file { read write create getattr };
+
+allow ping_t var_t:file { read write };

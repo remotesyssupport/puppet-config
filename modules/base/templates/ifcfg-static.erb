@@ -1,0 +1,10 @@
+DEVICE=<%= title %>
+TYPE=Ethernet
+BOOTPROTO=static
+HWADDR=<%= mac %>
+ONBOOT=yes
+IPADDR=<%= address %>
+NETMASK=<%= net_mask %>
+<% if gateway != "" %>
+GATEWAY=<%= gateway %>
+<% end %>

@@ -1,0 +1,13 @@
+[General]
+
+Verbosity = 0
+Pipefs-Directory = /var/lib/nfs/rpc_pipefs
+Domain = <%= title %>
+
+[Mapping]
+
+Nobody-User = <%= nobody_user %>
+Nobody-Group = <%= nobody_group %>
+
+[Translation]
+Method = nsswitch

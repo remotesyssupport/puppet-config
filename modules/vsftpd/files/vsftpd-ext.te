@@ -1,0 +1,12 @@
+module vsftpd-ext 1.1;
+
+require {
+        class dir { create write add_name remove_name rmdir getattr setattr };
+        class file { create read write append unlink rename getattr setattr };
+        type ftpd_t; 
+        type public_content_rw_t; 
+        role system_r; 
+};
+
+allow ftpd_t public_content_rw_t:dir { create write add_name };
+allow ftpd_t public_content_rw_t:file { create write append };

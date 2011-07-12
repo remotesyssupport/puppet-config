@@ -1,0 +1,6 @@
+$IPTABLES -A INPUT -m state --state NEW -p udp -m udp --dport 1194 -j ACCEPT 
+
+# Allow TCP connections to the internal interface
+# jww (2009-05-02): Only add this rule if used
+$IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF -p tcp -m tcp \
+	  --dport 1195 -j ACCEPT

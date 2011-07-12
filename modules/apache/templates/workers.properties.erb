@@ -1,0 +1,14 @@
+# Define list of workers that will be used
+# for mapping requests
+# The configuration directives are valid
+# for the mod_jk version 1.2.18 and later
+#
+worker.list=<%= title %>
+
+# Define Node1
+# modify the host as your host IP or DNS name.
+worker.node1.port=8009
+worker.node1.host=<%= host %>
+worker.node1.type=ajp13
+worker.node1.ping_mode=A #As of mod_jk 1.2.27
+# worker.node1.connection_pool_size=10 (1)

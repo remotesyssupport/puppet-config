@@ -1,0 +1,2 @@
+$IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF -p tcp -m tcp \
+    --dport 5432 -j ACCEPT 

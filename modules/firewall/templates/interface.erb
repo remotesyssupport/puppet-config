@@ -1,0 +1,10 @@
+<% if title == "public" %>
+PUBINTF=<%= device %>
+PUBADDR=<%= address %>
+<% elsif title == "private" %>
+PRIVINTF=<%= device %>
+PRIVADDR=<%= address %>
+<% else %>
+INTF=<%= device %>
+ADDR=<%= address %>
+<% end %>

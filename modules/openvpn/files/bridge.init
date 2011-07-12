@@ -1,0 +1,114 @@
+#!/bin/sh
+#
+#	/etc/rc.d/init.d/bridge
+#
+# Copyright 2002, Internet Solver, LLC
+# djweis@internetsolver.com
+# Internet Solver offers Linux consulting to help you
+#  get this functional in your network.
+#  http://www.internetsolver.com/
+#
+# Starts the bridging firewall
+#
+# chkconfig: 345 6 94
+# description: Sets up the bridging firewall
+# processname: brctl
+
+# Source function library.
+. /etc/init.d/functions
+
+br="br0"
+tap="tap0"
+# Define physical ethernet interface to be bridged
+# with TAP interface(s) above.
+# jww (2009-05-04): explicit IPs everywhere here!
+eth="eth1"
+eth_ip="10.100.2.1"
+eth_net="10.100.2.0/24"
+eth_netmask="255.255.255.0"
+eth_broadcast="10.100.2.255"
+#gw="10.9.19.247"
+
+RETVAL=0
+
+#
+#	See how we were called.
+#
+
+start() {
+	action $"Starting bridging interface:" true
+
+	for t in $tap; do
+	    openvpn --mktun --dev $t
+	done
+	for t in $tap; do
+	    ifconfig $t 0.0.0.0 promisc up
+	done
+	ifconfig $eth 0.0.0.0 promisc up
+
+	brctl addbr $br
+	brctl addif $br $eth
+	for t in $tap; do
+	    brctl addif $br $t
+	done
+
+	ifconfig $br $eth_ip netmask $eth_netmask broadcast $eth_broadcast up
+	ip route del $eth_net dev $eth > /dev/null 2>&1
+}
+
+stop() {
+	action $"Stopping bridging interface:" true
+
+	ifconfig $eth down
+	ifconfig $br down
+	for t in $tap; do
+	    ifconfig $t down
+	done
+
+	for t in $tap; do
+	    brctl delif $br $t
+	done
+	brctl delif $br $eth
+	brctl delbr $br
+
+	for t in $tap; do
+	    openvpn --rmtun --dev $t
+	done
+
+	ifconfig $eth $eth_ip netmask $eth_netmask broadcast $eth_broadcast up
+	#route add default gw $gw $eth
+}
+
+
+restart() {
+	stop
+	start
+}	
+
+reload() {
+	restart
+}	
+
+
+case "$1" in
+start)
+	start
+	;;
+stop)
+	stop
+	;;
+reload|restart)
+	restart
+	;;
+condrestart)
+	if [ -f /var/lock/subsys/bridge ]; then
+	    restart
+	fi
+	;;
+*)
+	echo $"Usage: $0 {start|stop|restart|condrestart|status}"
+	exit 1
+esac
+
+exit $?
+exit $RETVAL

@@ -1,0 +1,8 @@
+$IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF -p tcp -m tcp \
+    --dport 8222 -j ACCEPT
+$IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF -p tcp -m tcp \
+    --dport 8333 -j ACCEPT
+
+# Allow connections to the VPN ports on the private interface
+$IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF -p tcp -m tcp \
+    --dport 5900:5910 -j ACCEPT

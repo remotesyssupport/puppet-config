@@ -1,0 +1,6 @@
+for port in 111 662 892 2048 2049 32803 32769; do
+    $IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF \
+        -p tcp -m tcp --dport $port -j ACCEPT
+    $IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF \
+        -p udp -m udp --dport $port -j ACCEPT
+done

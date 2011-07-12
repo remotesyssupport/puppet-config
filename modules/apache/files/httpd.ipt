@@ -1,0 +1,1 @@
+$IPTABLES -A INPUT -m state --state NEW -p tcp -m tcp --dport http -j ACCEPT

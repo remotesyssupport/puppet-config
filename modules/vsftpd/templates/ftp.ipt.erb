@@ -1,0 +1,8 @@
+# FTP, but allow only 5 open connections per host, and 5 new connections
+# per minute from any given host (to block brute force scans)
+$IPTABLES -A INPUT -m state --state NEW -i $PUBINTF -p tcp -m tcp --dport ftp -m hashlimit \
+    --hashlimit 5/min --hashlimit-mode srcip --hashlimit-name ftpusers -j ACCEPT 
+
+# Passive FTP backports
+$IPTABLES -A INPUT -m state --state NEW -p tcp -m tcp \
+    --dport <%= ftpd_pasv_min_port %>:<%= ftpd_pasv_max_port %> -j ACCEPT 

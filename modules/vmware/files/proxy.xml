@@ -1,0 +1,38 @@
+<ConfigRoot>
+  <httpPort>8222</httpPort>
+  <httpsPort>8333</httpsPort>
+  <EndpointList>
+    <_length>5</_length>
+    <_type>vim.ProxyService.EndpointSpec[]</_type>
+    <e id="0">
+      <_type>vim.ProxyService.NamedPipeServiceSpec</_type>
+      <accessMode>httpAndHttps</accessMode>
+      <pipeName>/var/run/vmware/proxy-webserver</pipeName>
+      <serverNamespace>/</serverNamespace>
+    </e>
+    <e id="1">
+      <_type>vim.ProxyService.LocalServiceSpec</_type>
+      <accessMode>httpAndHttps</accessMode>
+      <port>8307</port>
+      <serverNamespace>/sdk</serverNamespace>
+    </e>
+    <e id="2">
+      <_type>vim.ProxyService.LocalServiceSpec</_type>
+      <accessMode>httpAndHttps</accessMode>
+      <port>8308</port>
+      <serverNamespace>/ui</serverNamespace>
+    </e>
+    <e id="3">
+      <_type>vim.ProxyService.NamedPipeServiceSpec</_type>
+      <accessMode>httpsOnly</accessMode>
+      <pipeName>/var/run/vmware/proxy-vpxa</pipeName>
+      <serverNamespace>/vpxa</serverNamespace>
+    </e>
+    <e id="4">
+      <_type>vim.ProxyService.NamedPipeServiceSpec</_type>
+      <accessMode>httpAndHttps</accessMode>
+      <pipeName>/var/run/vmware/proxy-mob</pipeName>
+      <serverNamespace>/mob</serverNamespace>
+    </e>
+  </EndpointList>
+</ConfigRoot>

@@ -1,0 +1,61 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import getopt
+import re
+
+def usage():
+    print """Usage: check_service [-h|--help] [-s NAME|--service NAME]"""
+    sys.exit(3)
+
+try:
+    options, args = getopt.getopt(sys.argv[1:],
+        "hs:",
+        "--help --service=",
+        )
+except getopt.GetoptError:
+    usage()
+    sys.exit(3)
+
+serviceName = None
+
+for name, value in options:
+    if name in ("-h", "--help"):
+        usage()
+    if name in ("-s", "--service"):
+        serviceName = value
+
+if serviceName is None:
+    print "SERVICE UNKNOWN: Could not determine service name"
+    sys.exit(3)
+
+running = None
+try:
+    status = os.popen("/usr/bin/sudo /sbin/service %s status" % serviceName)
+    for line in status.readlines():
+        match = re.search("is (running|stopped)", line)
+        if match:
+            running = match.group(1)
+            break
+        match = re.search("dead", line)
+        if match:
+            running = "dead"
+            break
+    status.close()
+except Exception:
+    print "%s UNKNOWN: Error while getting checking service" % serviceName
+    sys.exit(3)
+
+if running is None:
+    print "%s UNKNOWN: Service has unknown status" % serviceName
+    sys.exit(3)
+elif running == "dead":
+    print "%s CRITICAL: Service is dead" % serviceName
+    sys.exit(2)
+elif running == "stopped":
+    print "%s WARNING: Service has stopped" % serviceName
+    sys.exit(1)
+else:
+    print "%s OK: Service is running" % serviceName
+    sys.exit(0)

@@ -1,0 +1,1 @@
+$IPTABLES -A INPUT -m state --state NEW -p udp -m udp --dport 53 -j ACCEPT 

@@ -1,0 +1,33 @@
+module httpd-ext 1.17;
+
+require {
+        class dir { create write add_name remove_name rmdir getattr setattr };
+        class file { create read write append unlink rename getattr setattr };
+        class unix_dgram_socket { read write }; 
+        class tcp_socket name_connect;
+        type httpd_t; 
+        type httpd_config_t; 
+        type httpd_sys_script_t; 
+        type smtp_port_t; 
+        type pop_port_t; 
+        type http_cache_port_t; 
+        type postgresql_port_t; 
+        type public_content_rw_t; 
+        type tmp_t; 
+        role system_r; 
+};
+
+allow httpd_t tmp_t:file { getattr read };
+allow httpd_t http_cache_port_t:tcp_socket name_connect;
+
+allow httpd_t postgresql_port_t:tcp_socket name_connect;
+allow httpd_t smtp_port_t:tcp_socket name_connect;
+allow httpd_t pop_port_t:tcp_socket name_connect;
+
+allow httpd_t public_content_rw_t:dir { create write add_name remove_name rmdir setattr };
+allow httpd_t public_content_rw_t:file { create write append unlink rename setattr };
+allow httpd_sys_script_t public_content_rw_t:dir { create write add_name remove_name rmdir getattr setattr };
+allow httpd_sys_script_t public_content_rw_t:file { create read write append unlink rename getattr setattr };
+
+allow httpd_sys_script_t httpd_config_t:file { getattr read };
+allow httpd_sys_script_t httpd_t:unix_dgram_socket { read write };

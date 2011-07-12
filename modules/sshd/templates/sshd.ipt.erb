@@ -1,0 +1,2 @@
+# jww (2009-05-02): explicit host references!
+$IPTABLES -A INPUT -m state --state NEW <% if hostname == "abc-p1-pub-1" then %> -i $PRIVINTF <% end %> -p tcp -m tcp --dport ssh -j ACCEPT 

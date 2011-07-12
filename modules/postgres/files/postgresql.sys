@@ -1,0 +1,3 @@
+PGDATA=/var/lib/pgsql/data
+PGPORT=5432
+PGOPTS="-i"

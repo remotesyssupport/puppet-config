@@ -1,0 +1,16 @@
+# default: on
+# description: The vsftpd FTP server serves FTP connections. It uses \
+#	normal, unencrypted usernames and passwords for authentication.
+service ftp
+{
+	disable			= no
+	socket_type		= stream
+	wait			= no
+	user			= root
+	per_source		= 5
+	instances		= 50
+	server			= /usr/sbin/vsftpd
+	server_args             = /etc/vsftpd/vsftpd.conf
+	nice			= 10
+	flags			= IPv4
+}

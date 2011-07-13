@@ -1,12 +1,7 @@
-import '/root/bootstrap.pp'
+import '/tmp/puppet/bootstrap-agent.pp'
 
-file { "/etc/puppet/puppet.conf":
-  owner   => root,
-  group   => root,
-  mode    => 0755,
-  ensure  => present,
-  source  => "/root/puppet.conf",
-  require => Package["puppet"];
+File["/etc/puppet/puppet.conf"] {
+  source  => "/tmp/puppet/puppet-master.conf"
 }
 
 package { "rails": provider => gem }
@@ -69,7 +64,7 @@ case $operatingsystem {
       group   => root,
       mode    => 0755,
       ensure  => present,
-      source => "/root/puppetmaster";
+      source => "/tmp/puppet/puppetmaster.init";
     }
 
     $devel_pkgs = [ 'autoconf'

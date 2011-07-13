@@ -3,26 +3,6 @@ class yum
   package { "yum-priorities": ensure => latest }
 }
 
-class rpm::build
-{
-  $packages = [ 'autoconf'
-              , 'automake'
-              , 'libtool'
-              , 'make'
-              , 'gcc'
-              , 'gcc-c++'
-              , 'glibc-devel'
-              , 'kernel-devel'
-              , 'rpm-build'
-              , 'rpm-devel'
-              , 'openssl-devel'
-              , 'readline-devel'
-              , 'zlib-devel'
-              ]
-
-  package { $packages: ensure => latest }
-}
-
 class centos
 {
   include yum
@@ -64,18 +44,22 @@ class centos
   package { $remove: ensure => absent }
 }
 
-case $operatingsystem {
-  centos: {
-    include centos
-    if $hostname == "puppet" {
-      include rpm::build
-    }
-  }
-  fedora: {
-    include centos
-    if $hostname == "puppet" {
-      include rpm::build
-    }
-  }
-}
+class rpm::build
+{
+  $packages = [ 'autoconf'
+              , 'automake'
+              , 'libtool'
+              , 'make'
+              , 'gcc'
+              , 'gcc-c++'
+              , 'glibc-devel'
+              , 'kernel-devel'
+              , 'rpm-build'
+              , 'rpm-devel'
+              , 'openssl-devel'
+              , 'readline-devel'
+              , 'zlib-devel'
+              ]
 
+  package { $packages: ensure => latest }
+}

@@ -4,6 +4,7 @@
 # jww (2011-07-04): Have remote git clone a puppet repo to start the server
 
 ##############################################################################
+
 # This script is run in one of two ways:
 #
 #   puppet slave:  python bootstrap.py <IP ADDR OF 'puppet' MASTER>
@@ -27,54 +28,179 @@
 #  4. puppetd --test
 #  5. service puppet start (if the last step succeeded)
 #
+# This script is designed to be _idempotent_, meaning it can be run multiple
+# times and only new changes will be added to the system.
+#
 ##############################################################################
 
-import re
+import inspect
+import logging
+import logging.handlers
+import optparse
 import os
-import sys
-import shutil
 import platform
+import re
+import shutil
+import stat
 import subprocess
+import sys
+import time
 
 from os.path import *
 
-server = False
-if '--server' in sys.argv:
-    server = True
+##############################################################################
 
-# This script is designed to be _idempotent_, meaning it can be run multiple
-# times and only new changes will be added to the system.
+LEVELS = {'DEBUG':    logging.DEBUG,
+          'INFO':     logging.INFO,
+          'WARNING':  logging.WARNING,
+          'ERROR':    logging.ERROR,
+          'CRITICAL': logging.CRITICAL}
 
-def mkreader(*args, **kwargs):
-    print args
+class CommandLineApp(object):
+    "Base class for building command line applications."
+
+    force_exit  = True           # If true, always ends run() with sys.exit()
+    log_handler = None
+
+    options = {
+        'verbose':  False,
+        'logfile':  False,
+        'loglevel': False
+        'master':   False,
+    }
+
+    def __init__(self):
+        "Initialize CommandLineApp."
+        # Create the logger
+        self.log = logging.getLogger(os.path.basename(sys.argv[0]))
+        ch = logging.StreamHandler()
+        formatter = logging.Formatter("%(name)s: %(levelname)s: %(message)s")
+        ch.setFormatter(formatter)
+        self.log.addHandler(ch)
+        self.log_handler = ch
+
+        # Setup the options parser
+        usage = 'usage: %prog [options] <BOUND-IP-ADDRESS>'
+        op = self.option_parser = optparse.OptionParser(usage = usage)
+
+        op.add_option('-v', '--verbose',
+                      action='store_true', dest='verbose',
+                      default=False, help='show informational messages')
+        op.add_option('-q', '--quiet',
+                      action='store_true', dest='quiet',
+                      default=False, help='do not show log messages on console')
+        op.add_option('-s', '--master',
+                      action='store_true', dest='master',
+                      default=False, help='bootstrap a puppet master')
+        op.add_option('', '--log', metavar='FILE',
+                      type='string', action='store', dest='logfile',
+                      default=False, help='append logging data to FILE')
+        op.add_option('', '--loglevel', metavar='LEVEL',
+                      type='string', action='store', dest='loglevel',
+                      default=False, help='set log level: DEBUG, INFO, WARNING, ERROR, CRITICAL')
+
+    def main(self, *args):
+        """Main body of your application.
+
+        This is the main portion of the app, and is run after all of the
+        arguments are processed.  Override this method to implment the primary
+        processing section of your application."""
+        pass
+
+    def handleInterrupt(self):
+        """Called when the program is interrupted via Control-C or SIGINT.
+        Returns exit code."""
+        self.log.error('Canceled by user.')
+        return 1
+
+    def handleMainException(self):
+        "Invoked when there is an error in the main() method."
+        if not self.options.verbose:
+            self.log.exception('Caught exception')
+        return 1
+
+    ## INTERNALS (Subclasses should not need to override these methods)
+
+    def run(self):
+        """Entry point.
+
+        Process options and execute callback functions as needed.  This method
+        should not need to be overridden, if the main() method is defined."""
+        # Process the options supported and given
+        self.options, main_args = self.option_parser.parse_args()
+
+        if self.options.logfile:
+            fh = logging.handlers.RotatingFileHandler(self.options.logfile,
+                                                      maxBytes = (1024 * 1024),
+                                                      backupCount = 5)
+            formatter = logging.Formatter("%(asctime)s - %(levelname)s: %(message)s")
+            fh.setFormatter(formatter)
+            self.log.addHandler(fh)
+
+        if self.options.quiet:
+            self.log.removeHandler(self.log_handler)
+            ch = logging.handlers.SysLogHandler()
+            formatter = logging.Formatter("%(name)s: %(levelname)s: %(message)s")
+            ch.setFormatter(formatter)
+            self.log.addHandler(ch)
+            self.log_handler = ch
+
+        if self.options.loglevel:
+            self.log.setLevel(LEVELS[self.options.loglevel])
+        elif self.options.verbose:
+            self.log.setLevel(logging.DEBUG)
+        else:
+            self.log.setLevel(logging.INFO)
+        
+        exit_code = 0
+        try:
+            # We could just call main() and catch a TypeError, but that would
+            # not let us differentiate between application errors and a case
+            # where the user has not passed us enough arguments.  So, we check
+            # the argument count ourself.
+            argspec = inspect.getargspec(self.main)
+            expected_arg_count = len(argspec[0]) - 1
+
+            if len(main_args) >= expected_arg_count:
+                exit_code = self.main(*main_args)
+            else:
+                self.log.debug('Incorrect argument count (expected %d, got %d)' %
+                               (expected_arg_count, len(main_args)))
+                self.option_parser.print_help()
+                exit_code = 1
+
+        except KeyboardInterrupt:
+            exit_code = self.handleInterrupt()
+
+        except SystemExit, msg:
+            exit_code = msg.args[0]
+
+        except Exception:
+            exit_code = self.handleMainException()
+            if self.options.verbose:
+                raise
+            
+        if self.force_exit:
+            sys.exit(exit_code)
+        return exit_code
+
+def mkreader(self, *args, **kwargs):
+    self.log.info(str(args))
     kwargs['stdout'] = subprocess.PIPE
     p = subprocess.Popen(args, **kwargs)
     return p.stdout
 
-def mkwriter(*args, **kwargs):
-    print args
+def mkwriter(self, *args, **kwargs):
+    self.log.info(str(args))
     kwargs['stdin'] = subprocess.PIPE
     p = subprocess.Popen(args, **kwargs)
     return p.stdin
 
-def shell(*args, **kwargs):
-    if 'cwd' in kwargs:
-        cwd = os.getcwd()
-        print '%s (in %s)' % (args, cwd)
-        try:
-            os.chdir(kwargs['cwd'])
-            if subprocess.call(args, **kwargs) == 0:
-                return True
-            else:
-                raise Exception("Command failed: %s (in %s)" % (args, cwd))
-        finally:
-            os.chdir(cwd)
-    else:
-        print args
-        if subprocess.call(args, **kwargs) == 0:
-            return True
-        else:
-            raise Exception("Command failed: " + str(args))
+def shuttle(self, reader, writer):
+    data = reader.read(8192)
+    while data:
+        writer.write(data)
+        data = reader.read(8192)
 
 def grep(path, regexp):
     fd = open(path, 'r')
@@ -105,48 +231,116 @@ def append_file(path, line_to_add):
 
     os.remove(temp_path)
 
-def install(*pkgs):
-    shell('yum', 'install', '-y', *pkgs)
+def shell(*args, **kwargs):
+    if 'stdout' not in kwargs: kwargs['stdout'] = sys.stdout
+    if 'stderr' not in kwargs: kwargs['stderr'] = sys.stderr
 
-def install64(*pkgs):
-    shell('yum', 'install', '-y', *map(lambda x: x + '.x86_64', pkgs))
+    if 'cwd' in kwargs:
+        cwd = os.getcwd()
+        print '%s (in %s)' % (args, cwd)
+        try:
+            os.chdir(kwargs['cwd'])
+            if subprocess.call(args, **kwargs) == 0:
+                return True
+            else:
+                raise Exception("Command failed: %s (in %s)" % (args, cwd))
+        finally:
+            os.chdir(cwd)
+    else:
+        print args
+        if subprocess.call(args, **kwargs) == 0:
+            return True
+        else:
+            raise Exception("Command failed: " + str(args))
+    def shell(self, *args, **kwargs):
 
-packages = []
+        self.log.info(str(args))
+        if subprocess.call(args, **kwargs) == 0:
+            return True
+        else:
+            raise Exception("Command failed: " + str(args))
 
-def get_package_list():
-    global packages
-    if sys.platform == 'linux2':
-        for line in mkreader('yum', 'list', 'installed'):
-            match = re.match('^(.+?)\s+', line)
-            if match:
-                package = match.group(1)
-                if re.search('\.', package):
-                    packages.append(package)
+##############################################################################
 
-def has_package(pkg):
-    global packages
-    if not packages: get_package_list()
-    for package in packages:
-        if re.search(re.escape(pkg), package):
-            return package
+class Machine(object):
+    is_64bit = False
+    packages = []
 
-    return None
+    def __init__(self):
+        self.packages = []
 
-def remove(*pkgs):
-    to_remove = []
-    for pkg in pkgs:
-        if has_package(pkg):
-            to_remove.append(pkg)
-            break
-    if len(to_remove) > 0:
-        shell('yum', 'remove', '-q', '-y', *to_remove)
+    def install(self, *pkgs):
+        raise Exception("Not implemented")
 
-# Clean up non-64bit packages
+    def uninstall(self, *pkgs):
+        raise Exception("Not implemented")
 
-if sys.platform == 'linux2' and platform.architecture()[0] == '64bit':
-    if not packages:
-        get_package_list()
-    remove(*filter(lambda x: not re.search('(x86_64|noarch)', x), packages))
+    def remove(*pkgs):
+        to_remove = []
+        for pkg in pkgs:
+            if has_package(pkg):
+                to_remove.append(pkg)
+                break
+        if len(to_remove) > 0:
+            self.uninstall(*to_remove)
+
+    def installed_packages(self):
+        raise Exception("Not implemented")
+
+    def cleanup_packages(self):
+        pass
+
+    def has_package(self, pkg):
+        for package in self.installed_packages():
+            if re.search(re.escape(pkg), package):
+                return package
+        return None
+
+class Machine_CentOS(Machine):
+    def __init__(self):
+        Machine.__init__(self)
+        self.is_64bit = platform.architecture()[0] == '64bit'
+
+    def install(self, *pkgs):
+        if self.is_64bit:
+            shell('yum', 'install', '-y', *map(lambda x: x + '.x86_64', pkgs))
+        else:
+            shell('yum', 'install', '-y', *pkgs)
+
+    def uninstall(self, *pkgs):
+        shell('yum', 'remove', '-q', '-y', *pkgs)
+
+    def installed_packages(self):
+        if not self.packages:
+            for line in mkreader('yum', 'list', 'installed'):
+                match = re.match('^(.+?)\s+', line)
+                if match:
+                    package = match.group(1)
+                    if re.search('\.', package):
+                        self.packages.append(package)
+        return self.packages
+
+    def cleanup_packages(self):
+        # Clean up non-64bit packages
+        if self.is_64bit:
+            remove(*filter(lambda x: not re.search('(x86_64|noarch)', x),
+                           self.installed_packages()))
+
+##############################################################################
+
+class PuppetCommon(object):
+    machine = None
+
+    def __init__(self, machine):
+        self.machine = machine
+
+class PuppetAgent(PuppetCommon):
+    pass
+
+class PuppetMaster(PuppetCommon):
+    pass
+
+#############################################################################
 
 # Build and install Ruby
 
@@ -228,86 +422,9 @@ if not grep('/etc/hosts', '\<puppet\>'):
     else:
         append_file('/etc/hosts', '127.0.0.1   puppet')
 
-if server:
+if master:
     shell('puppet', 'apply', '--verbose', 'bootstrap-master.pp')
 else:
-    shell('puppet', 'apply', '--verbose', 'bootstrap.pp')
+    shell('puppet', 'apply', '--verbose', 'bootstrap-agent.pp')
 
 sys.exit(0)
-
-##############################################################################
-##############################################################################
-##############################################################################
-
-def shuttle(reader, writer):
-    data = reader.read(8192)
-    while data:
-        writer.write(data)
-        data = reader.read(8192)
-
-def modify(path, regexp, subst=None):
-    modified  = False
-    temp_path = join('/tmp', basename(path))
-
-    fd = open(path, 'r')
-    out = open(temp_path, 'w')
-    for line in fd:
-        if subst:
-            new_line = re.sub(regexp, subst, line)
-            if line != new_line:
-                modified = True
-                line = new_line
-        elif re.search(regexp, line):
-            modified = True
-            continue
-        out.write(line)
-    out.close()
-    fd.close()
-
-    fd = open(temp_path, 'r')
-    out = open(path, 'w')
-    for line in fd:
-        out.write(line)
-    out.close()
-    fd.close()
-
-    os.remove(temp_path)
-
-    return modified
-
-##############################################################################
-
-# Setup SSH
-
-if not isdir('/root/.ssh'):
-    os.mkdir('/root/.ssh', 0700)
-
-if not isdir('/root/.ssh/authorized_keys'):
-    authorized_keys = open('/root/.ssh/authorized_keys', 'w')
-    authorized_keys.write('''ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAuieodZ1orcaND9D7eOurADUH353+3ngTgKRt+SZ9clstR4l4lWr4BCZrrEITS3lka6AgqNDepNfGIuGrFoQkV/3R2aathNNZJt/vsSCFSD2RbUNDiAl4JODqkVXpdUsDS+0DLtsvHfTlpgfTabU3rs/WJuG3YnpSFFRclYoE7aLeuKgI+0HtrtIQVyzO+E6+t3eAVKlgRi6c0f0MKeElHsgh5s1InxPUMr8JiT9C+3Uio2DlTUT0wZc0Amix0JbpgfsxJ8uSqn/0z93ty133ZJX6KzvB95aF6AFnseptzM5/Fl5CKclbsOta99NBEGVjZwpzUZNhXRfaEtAWQI/Htw==
-mobile@John-Wiegleys-iPhone
-ssh-dss AAAAB3NzaC1kc3MAAACBAIW3kMaGkdT02c09kslw+/HPOVPpuquwySb2vXgrdvtJsrUtJiEsyP+Us5s0T3ZzlDfqKHs5CdPXGe28/TzPgzCqL/sRcJid9Tddu1a2bt9Sfy9iEdNEt+jb0llBqLAcjRHT3tSR/PqcT3Pf3/gk2rFge1nC0x/41OL6rHyUk4IDAAAAFQCVFfTWFTobd10lkMRBncDecpktxQAAAIBfhRw/VwYGf93JcyOre3MKhoezPS0DbH0QqmQrs2KJgD+ZvimB9qc6dBLlOoy0HjjbCIiNsonwlgJ4EWeutWbabwqr3A3MH9fDuvhTdRqkUdyQsbQZkL0iU2UZ+jKnZNgOXYTFBJECHVlaX0wgaAk9sB3li+rFY91tsYI/mpwPrwAAAIA/HHj7nZ4O8pZsnsv6EeSWyoHVw1L0AfPKOa5dQuARNKDe4Ef96n+T3mdSBcuUdzVW1+co0y98as6z1DqNAS7pr2LILDMU9dn1YIE3SLqSoxzi1VxN7XWE7wwbr+64Wr/7M8d3AGFe3pYR8zHCeOD2YBaH05CCIdf4bWKUo6NcRw== johnw@aris
-ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAIEAwTFboeliU48xemZzecpkVylbQ+mCbBCf1WxwpIRVZCpv4Qqod+hzez7nJFeMfr1XVHdo2J0WyJAvbtinGxRBLa23DoyPtLppTy3YCZyiRJ8ULx6J1sBwhFwYZe4ZF2l0EBDzD4RsrQCtozQPmnv3QBHQ85zMi5PjXusLXoqmQjk= johnw@aris
-''')
-    os.chmod('/root/.ssh/authorized_keys', 0600)
-
-if isfile('/etc/ssh/sshd_config'):
-    if not modify('/etc/ssh/sshd_config',
-                  '^#?PermitRootLogin .*', 'PermitRootLogin without-password'):
-        append_file('/etc/ssh/sshd_config', 'PermitRootLogin without-password')
-
-if sys.platform == 'sunos5':
-    modify('/etc/default/login', '^CONSOLE=/dev/login', '#CONSOLE=/dev/login')
-    shell('rolemod', '-K', 'type=normal', 'root')
-    shell('svcadm', 'restart', 'ssh')
-
-elif sys.platform == 'linux2':
-    shell('service', 'sshd', 'restart')
-
-##############################################################################
-
-##############################################################################
-
-modify('/etc/sysconfig/network', '^HOSTNAME=.*', 'HOSTNAME=puppet.local')
-
-### bootstrap.py ends here

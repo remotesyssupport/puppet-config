@@ -1,5 +1,14 @@
 package { "puppet": provider => gem }
 
+file { "/etc/puppet/puppet.conf":
+  owner   => root,
+  group   => root,
+  mode    => 0755,
+  ensure  => present,
+  source  => "/tmp/puppet/puppet-agent.conf",
+  require => Package["puppet"];
+}
+
 group { puppet:
   ensure  => present,
   require => Package[puppet];
@@ -28,7 +37,7 @@ case $operatingsystem {
       group   => root,
       mode    => 0755,
       ensure  => present,
-      source  => "/root/puppet",
+      source  => "/tmp/puppet/puppet.init",
       require => Package[puppet];
     }
 

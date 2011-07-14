@@ -1,0 +1,9 @@
+$IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF -p tcp -m tcp --dport 1098 -j ACCEPT
+$IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF -p tcp -m tcp --dport 1099 -j ACCEPT
+$IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF -p tcp -m tcp --dport 1101 -j ACCEPT
+$IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF -p tcp -m tcp --dport 8009 -j ACCEPT
+$IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF -p tcp -m tcp --dport 8083 -j ACCEPT
+$IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF -p tcp -m tcp --dport 8787 -j ACCEPT
+$IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF -p tcp -m tcp --dport 9090 -j ACCEPT
+$IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF -p tcp -m tcp --dport 4446 -j ACCEPT
+$IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF -p tcp -m tcp --dport 4447 -j ACCEPT

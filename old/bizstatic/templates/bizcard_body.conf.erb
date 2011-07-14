@@ -1,0 +1,208 @@
+ServerName <%= server_name %>
+ServerAlias <%= server_alias %>
+
+ServerAdmin <%= server_admin %>
+
+# Possible values include: debug, info, notice, warn, error, crit,
+# alert, emerg.
+LogLevel <%= log_level %>
+
+#ErrorLog syslog
+ErrorLog /var/log/httpd/<%= title %>-error_log
+CustomLog /var/log/httpd/<%= title %>-access_log combined
+
+ServerSignature On
+RewriteEngine On
+
+RewriteLog /var/log/httpd/<%= title %>-rewrite_log
+RewriteLogLevel 2
+
+#-- permissions
+
+# grant access to style folder
+<LocationMatch "^/s/.*">
+    Order Deny,Allow
+    Allow from All
+</LocationMatch>
+
+# grant access to content folder
+<LocationMatch "^/c/.*">
+    Order Deny,Allow
+    Allow from All
+</LocationMatch>
+
+
+
+# grant access to fde folder
+<LocationMatch "^/ui/.*">
+    Order Deny,Allow
+    Allow from All
+</LocationMatch>
+
+<LocationMatch "^/component/.*">
+    Order Deny,Allow
+    Allow from All
+</LocationMatch>
+
+<LocationMatch "^/font/.*">
+    Order Deny,Allow
+    Allow from All
+</LocationMatch>
+
+<LocationMatch "^/config/.*">
+    Order Deny,Allow
+    Allow from All
+</LocationMatch>
+
+# end fde
+
+
+
+
+# grant access to /robots.txt
+<LocationMatch "^/robots.txt">
+    Order Deny,Allow
+    Allow from All
+</LocationMatch>
+
+# grant access to /favicon.ico
+<LocationMatch "^/favicon.ico">
+    Order Deny,Allow
+    Allow from All
+</LocationMatch>
+
+#-- rewrite rules
+
+RewriteEngine On
+
+RewriteMap unescape int:unescape
+
+<FilesMatch "\.(ico|pdf|flv|jpg|jpeg|png|gif|js|css|swf)$">
+    Header set Cache-Control "max-age=290304000, public"
+</FilesMatch>
+
+# Notify that the site is down for maintenance
+#RewriteCond %{REMOTE_ADDR} !^(216\.189\.172\.51|67\.137\.106\.131)$
+#RewriteRule !(/503-notice.html|images/bizcard_logo.gif)$ /503-notice.html [L,R=503]
+#ErrorDocument 503 /503-notice.html
+
+# -------------------------------------------------------
+#FDE
+# -------------------------------------------------------
+
+# page
+RewriteRule ^/fde/designdocument$                       /bizcard.com/designdocument [L,PT] 
+
+# parameters
+RewriteRule ^/config/Parameters.xml$                    /srv/bizcard.com/WEB-INF/classes/template/page/document/design/fde/config/Parameters.xml [L]
+
+# fonts
+RewriteRule ^/font/Fonts.xml$                           /bizcard.com/a/font/getFontsXML [L,PT] 
+RewriteRule ^/font/Font(.*)\.swf$                       /bizcard.com/a/font/getFont?slotNo=$1 [L,PT] 
+
+
+# static swf
+RewriteRule ^/ui/(.*)$                             /srv/bizcard.com/WEB-INF/classes/template/page/document/design/fde/ui/$1 [L]
+RewriteRule ^/component/(.*)$                      /srv/bizcard.com/WEB-INF/classes/template/page/document/design/fde/component/$1 [L]
+RewriteRule ^/font/ext/(.*)$                       /srv/bizcard.com/WEB-INF/classes/template/page/document/design/fde/font/ext/$1 [L]
+
+# external graphics
+RewriteRule ^/externalgraphic/secured/ExternalGraphic_(.+)\.xml     /bizcard.com/a/designdocument/getSecuredExternalGraphicAsXML?externalGraphicID=$1 [L,PT]
+RewriteRule ^/externalgraphic/unsecured/ExternalGraphic_(.+)\.xml   /bizcard.com/a/designdocument/getUnsecuredExternalGraphicAsXML?externalGraphicID=$1 [L,PT]
+
+RewriteRule ^/externalgraphic/secured/editorimage/(.+)\.jpg         /bizcard.com/i/document.design.SecuredEditorImage?externalGraphicID=$1 [L,PT]
+RewriteRule ^/externalgraphic/secured/previewimage/(.+)\.jpg        /bizcard.com/i/document.design.SecuredPreviewImage?externalGraphicID=$1 [L,PT]
+
+RewriteRule ^/externalgraphic/unsecured/editorimage/(.+)\.jpg       /bizcard.com/i/document.design.UnsecuredEditorImage?externalGraphicID=$1 [L,PT]
+RewriteRule ^/externalgraphic/unsecured/previewimage/(.+)\.jpg      /bizcard.com/i/document.design.UnsecuredPreviewImage?externalGraphicID=$1 [L,PT]
+
+# -------------------------------------------------------
+# end FDE
+# -------------------------------------------------------
+
+# [S]tatic > CSS: this directive is to serve static CSS
+RewriteRule ^/s/y/((.*)shell\.css)$                 /srv/bizcard.com/WEB-INF/classes/template/shell/$1 [L]
+RewriteRule ^/s/y/((.*)Page\.css)$                  /srv/bizcard.com/WEB-INF/classes/template/page/$1 [L]
+RewriteRule ^/s/y/((.*)\.css)$                      /srv/bizcard.com/WEB-INF/classes/template/shell/$1 [L]
+
+# [S]tatic > JavaScript: this directive is to serve static JavaScript
+RewriteRule ^/s/j/((.*)shell\.js)$                  /srv/bizcard.com/WEB-INF/classes/template/shell/$1 [L]
+RewriteRule ^/s/j/((.*)Page\.js)$                   /srv/bizcard.com/WEB-INF/classes/template/page/$1 [L]
+RewriteRule ^/s/j/((.*)LocalLib\.js)$               /srv/bizcard.com/WEB-INF/classes/template/page/$1 [L]
+RewriteRule ^/s/j/((.*)\.js)$                       /srv/bizcard.com/WEB-INF/classes/template/shell/$1 [L]
+
+
+# [S]tatic > Image: this directive is to serve static style related images (e.g. buttons, other non-content images)
+RewriteRule ^/s/i/((.*)\.(gif|jpg|png))$            /srv/bizcard.com/image/$1  [L]
+
+# [S]tatic > Flas/mnt/data this directive is to serve static Flash
+RewriteRule ^/s/f/((.*)\.swf)$                      /srv/bizcard.com/WEB-INF/classes/template/page/$1 [L]
+
+# [C]ontent > Image: Catalog: this directive is to catalog image content
+RewriteRule ^/c/i/catalog/((.*)\.(gif|jpg|png))$    /mnt/data/catalogimages/final/$1 [L]
+
+# [C]ontent > Image: ProductCarousel: this directive is to retrieve a dynamically generate images for catalog items in the product carousel
+RewriteRule ^/c/i/productcarousel/featured/(([0-9]+)_([0-9]+)_([0-9]+))-w([0-9]+)-h([0-9]+)-r([0-9]+).jpg$      /bizcard.com/i/home.FeaturedProductCarouselItemImage?itemID=$1&int:width=$5&int:height=$6&int:rotation=$7   [L,PT]
+RewriteRule ^/c/i/productcarousel/free/(([0-9]+)_([0-9]+)_([0-9]+))-w([0-9]+)-h([0-9]+)-r([0-9]+).jpg$          /bizcard.com/i/home.FreeProductCarouselItemImage?itemID=$1&int:width=$5&int:height=$6&int:rotation=$7       [L,PT]
+
+# [C]ontent > Style
+RewriteRule ^/c/y/((.*)\.css)$                      /srv/bizcard.com/page/$1 [L]
+
+CacheRoot               /srv/bizcard.com/cache/productcarousel/featured
+CacheDirLevels          3
+CacheDirLength          3
+CacheLastModifiedFactor 0.1 
+CacheEnable             disk    /c/i/productcarousel/featured/
+
+CacheRoot               /srv/bizcard.com/cache/productcarousel/free
+CacheDirLevels          3
+CacheDirLength          3
+CacheLastModifiedFactor 0.1 
+CacheEnable             disk    /c/i/productcarousel/free/
+
+# [C]ontent > Image: this directive is to serve image content
+RewriteRule ^/c/i/((.*)\.(gif|jpg|png))$                /srv/bizcard.com/page/$1 [L]
+
+# Special: we need to serve robots.txt and favicon.ico from the root
+RewriteRule ^/robots\.txt$                          /srv/bizcard.com/robots.txt [L]
+RewriteRule ^/favicon\.ico$                         /srv/bizcard.com/favicon.ico [L]
+
+# Rewrite named product categories to product home
+RewriteRule ^/product/free-(.+)$                    /bizcard.com/freeproducthome?productCategoryMnemonic=$1 [L,PT] 
+
+# Rewrite named product categories to product home
+RewriteRule ^/product/(.+)$                         /bizcard.com/producthome?productCategoryMnemonic=$1 [L,PT] 
+
+# Rewrite named INDUSTRY-PRODUCT categories to INDUSTRY PRODUCT home
+RewriteRule ^/industry/(.+)/(.+)$                   /bizcard.com/industryproducthome?industryCategoryMnemonic=$1&productCategoryMnemonic=$2 [L,PT] 
+
+# Rewrite named INDUSTRY categories to INDUSTRY home
+RewriteRule ^/industry/(.+)$                        /bizcard.com/industryhome?industryCategoryMnemonic=$1 [L,PT] 
+
+# [D]ynamic > CSS: this directive is to serve dynamic CSS
+RewriteRule ^/y/((.*)shell\.css)$                   /bizcard.com/a/csspreprocessor/get?templateName=$2shell.css [L,PT]
+RewriteRule ^/y/((.*)Page\.css)$                    /bizcard.com/a/csspreprocessor/get?templateName=$2Page.css [L,PT]
+
+# [D]ynamic > JavaScript: this directive is to serve dynamic JavaScript
+RewriteRule ^/j/((.*)shell\.js)$                    /bizcard.com/a/jspreprocessor/get?templateName=$2shell.js [L,PT]
+RewriteRule ^/j/((.*)Page\.js)$                     /bizcard.com/a/jspreprocessor/get?templateName=$2Page.js [L,PT]
+
+RewriteRule ^/(503-notice\.html)$                   /srv/bizcard.com/$1 [L]
+
+# [D]ynamic: this directive send everything else to the bizcard.com/FLEX system
+RewriteRule ^/(.*)                                  /bizcard.com/$1     [L,PT]
+
+#<% if proxy_hosts.length == 1 then %>
+#   ProxyPass /bizcard.com http://<%= proxy_hosts[0] %>/bizcard.com
+#<% else %>
+#   ProxyPass /bizcard.com balancer://tcc_balancer stickysession=JSESSIONID nofailover=On 
+#
+#   <Proxy balancer://tcc_balancer>
+#      <% proxy_hosts.each do |host| %>
+#         BalancerMember http://<%= host %>/bizcard.com loadfactor=1 route=<%= host.sub(":", "_") %>
+#      <% end %>
+#   </Proxy>
+#<% end %>
+
+JkMount /bizcard.com/* node1
+JkMountFile conf/uriworkermap.properties

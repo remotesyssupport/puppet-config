@@ -1,0 +1,137 @@
+# ABC (and ADC) site configuration
+
+class config:
+
+    # Maintenance mode - no logins, signups, or document creation permitted.
+    MAINTENANCE_MODE = 0
+
+    # No signups mode - logins allowed, but signups not permitted.
+    NO_SIGNUPS_MODE = 0
+
+    # Editable Regions - browser editing allowed, turned off
+    EDITABLE_MODE = 0
+
+    # URL to site's home page (static).
+    HOME_URL = 'http://americanbusinesscard.com/user/cgi/index.hd'
+
+    # URL to dynamic scripts.
+    BASE_URL = '/user/cgi/'
+
+    # Absolute URLs for SSL support.
+    LOGIN_URL  = '/user/cgi/login.hd'
+    LOGOUT_URL = '/user/cgi/logout.hd'
+    SIGNUP_URL = '/user/cgi/signup.hd'
+
+    # Image and static content locations.
+    IMAGES_URL = '/user/images'
+    HTDOCS_URL = '/user'
+
+    # Email confirmation address
+    CSR_EMAIL                  = 'csr@americanbusinesscard.com'
+    NEW_USER_SIGNUP_EMAIL_LIST = ['csr@americanbusinesscard.com']
+    CUSTOM_REQUEST_EMAIL_LIST  = ['custom@americanbusinesscard.com']
+    ORDER_PLACED_EMAIL_LIST    = ['csr@americanbusinesscard.com'] 
+    CONTACT_US_EMAIL_LIST      = ['csr@americanbusinesscard.com'] 
+    SAMPLE_REQUEST_EMAIL       = 'samples@americanbusinesscard.com'
+    
+    # Merchant ID for site
+    MERCHANT_ID     = app.merchant_id
+    MERCHANT_TITLE  = ('American Business Card', 'ABC')
+    
+    # Modifications for ADC.
+    if MERCHANT_ID == '4':
+        BASE_URL        = '/adc/cgi/'
+        IMAGES_URL      = '/adc/images'
+        HTDOCS_URL      = '/adc'
+        LOGIN_URL       = 'http://americanbusinesscard.com/adc/cgi/login.hd'
+        LOGOUT_URL      = 'http://americanbusinesscard.com/adc/cgi/logout.hd'
+        SIGNUP_URL      = 'http://americanbusinesscard.com/adc/cgi/signup.hd'
+        HOME_URL        = 'http://americanbusinesscard.com/adc/cgi/index.hd'
+        MERCHANT_TITLE  = ('American Designer Cards', 'ADC')
+        
+    ##########  HARD CODED VALUES  #############
+    CUSTOM_LAYOUT_ID_L = '24        ' #1000 on live
+    CUSTOM_MAP_ID_L    = '25        ' #1001 on live
+
+    CUSTOM_LAYOUT_ID_P = '26        ' #1002 on live
+    CUSTOM_MAP_ID_P    = '27        ' #1003 on live
+
+    CUSTOM_NOTES_FIELD = '151       '
+
+    TEXT_FIELD_NAME    = '0'
+    TEXT_FIELD_DEGREE  = '1'
+
+    TEXT_FIELD_NAME2   = '63'
+    TEXT_FIELD_DEGREE2 = '64'
+    
+
+    DENTAL_ID          = '0'
+    CHIROPRACTIC_ID    = '1'
+    VETERINARY_ID      = '2'
+    MEDICAL_ID         = '3'
+    LAW_ID             = '5'
+    REAL_ESTATE_ID     = '6'
+    MORTGAGE_ID        = '32'
+
+    CATALOG_DESIGNS_PER_PAGE    = 10
+    CATALOG_DEFAULT_INDUSTRY_ID = int(DENTAL_ID)
+    CATALOG_DEFAULT_CATEGORY_ID = 0
+    
+    if MERCHANT_ID == '4':
+        CATALOG_DEFAULT_INDUSTRY_ID = int(REAL_ESTATE_ID)
+    
+    BUSINESS_CARD_L    = ('0','business card')
+    LETTERHEAD         = ('1','letterhead or envelope')
+    ENVELOPE           = ('2','envelope')
+    BUSINESS_CARD_P    = ('3','business card')
+    MAGNETIC_CARD_L    = ('4','magnetic card')
+    MAGNETIC_CARD_P    = ('5','magnetic card')
+
+    EMAIL_HOST = '<%= gw_1 %>'
+    
+    ##########  END HARD CODED VALUES  #########
+
+    ORDER_UNIT = '0         '  # Box or Individual Item
+
+    # Comment out the second line to cache template globals.
+    import abc_globals
+    reload(abc_globals)
+
+    # FreeMarker template globals.
+    FTL_GLOBALS = abc_globals.__dict__.copy()
+    FTL_GLOBALS.update({
+        'MAINTENANCE_MODE': MAINTENANCE_MODE,
+        'NO_SIGNUPS_MODE':  NO_SIGNUPS_MODE,
+        'EDITABLE_MODE':    EDITABLE_MODE,
+        'HOME_URL':         HOME_URL,
+        'IMAGES_URL':       IMAGES_URL,
+        'HTDOCS_URL':       HTDOCS_URL,
+        'LOGIN_URL':        LOGIN_URL,
+        'LOGOUT_URL':       LOGOUT_URL,
+        'SIGNUP_URL':       SIGNUP_URL,
+        'EMAIL_HOST':       EMAIL_HOST,
+    })
+
+    # Global utility functions
+    # ------------------------
+
+    # Page configuration module.
+    if MERCHANT_ID == '0':
+        import ABCPageConfig as PageConfig
+    elif MERCHANT_ID == '4':
+        import ADCPageConfig as PageConfig
+    else:
+        raise Exception('unknown merchant id: %s' % MERCHANT_ID)
+    PageConfig.FTL_GLOBALS = FTL_GLOBALS
+
+    # Dictionary constructor.
+    dict = lambda x: reduce(lambda x, y: x.update({y[0]:y[1]}) or x, x, {})
+
+    # HTTP redirection function.
+    from redirect import redirect
+
+    # Debugging pretty-printer.
+    from Debug import write as debug
+
+globals().update(config.__dict__)
+del config

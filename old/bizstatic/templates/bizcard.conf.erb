@@ -1,0 +1,64 @@
+NameVirtualHost *:80
+NameVirtualHost *:443
+
+<VirtualHost *:80>
+    ServerName images.bizcard.com
+    
+    RewriteEngine On
+
+    RewriteRule ^/c/i/catalog/((.*)\.(gif|jpg|png))$    /mnt/data/catalogimages/final/$1 [L]	
+
+    # [C]ontent > Image: ProductCarousel: this directive is to retrieve a dynamically generate images for catalog items in the product carousel
+    RewriteRule ^/c/i/productcarousel/featured/(([0-9]+)_([0-9]+)_([0-9]+))-w([0-9]+)-h([0-9]+)-r([0-9]+).jpg$      /tcc/i/home.FeaturedProductCarouselItemImage?itemID=$1&int:width=$5&int:height=$6&int:rotation=$7   [L,PT]
+    RewriteRule ^/c/i/productcarousel/free/(([0-9]+)_([0-9]+)_([0-9]+))-w([0-9]+)-h([0-9]+)-r([0-9]+).jpg$          /tcc/i/home.FreeProductCarouselItemImage?itemID=$1&int:width=$5&int:height=$6&int:rotation=$7       [L,PT]
+
+    # [C]ontent > Image: this directive is to serve image content
+    RewriteRule ^/c/i/((.*)\.(gif|jpg|png))$                /srv/bizcard.com/page/$1 [L]
+
+    <LocationMatch "^/c/.*">
+        Order Deny,Allow
+        Allow from All
+    </LocationMatch>
+</VirtualHost>                                  
+
+<VirtualHost *:80>
+    Include "/etc/httpd/<%= title %>_body.conf"
+
+    # inform downstream reverse proxied servers of the origin protocol
+    <LocationMatch "^/(.*)">
+        RequestHeader set x-forwarded-protocol      "http"
+        RequestHeader set x-forwarded-request       %{THE_REQUEST}s
+    </LocationMatch>
+
+    RewriteCond %{HTTP_HOST} !^<%= server_name %>$
+    RewriteRule ^/(.*) http://<%= server_name %>/$1 [L,R]
+
+    RewriteRule ^/(.*)/ http://<%= server_name %>/$1 [L,R]
+</VirtualHost>                                  
+
+<VirtualHost *:443>
+    Include "/etc/httpd/<%= title %>_body.conf"
+
+    # inform downstream reverse proxied servers of the origin protocol
+    <LocationMatch "^/(.*)">
+        RequestHeader set x-forwarded-protocol      "https"
+        RequestHeader set x-forwarded-request       %{THE_REQUEST}s
+    </LocationMatch>
+
+    RewriteCond %{HTTP_HOST} !^<%= server_name %>$
+    RewriteRule ^/(.*) https://<%= server_name %>/$1 [L,R]
+
+    RewriteRule ^/(.*)/ https://<%= server_name %>/$1 [L,R]
+
+    #----- SSL configuration
+    SSLEngine on
+    SSLCipherSuite ALL:!ADH:!EXPORT56:RC4+RSA:+HIGH:+MEDIUM:+LOW:+SSLv2:+EXP:+eNULL
+    SSLCertificateFile      /etc/pki/tls/certs/<%= title %>.crt
+    SSLCertificateChainFile /etc/pki/tls/certs/<%= title %>.ca-bundle
+    SSLCertificateKeyFile   /etc/pki/tls/private/<%= title %>.key
+    
+    BrowserMatch ".*MSIE.*" nokeepalive ssl-unclean-shutdown downgrade-1.0 force-response-1.0
+</VirtualHost>                                  
+    
+ErrorDocument 500 /500-notice.html
+ErrorDocument 503 /503-notice.html

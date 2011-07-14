@@ -1,0 +1,1 @@
+$IPTABLES -A INPUT -m state --state NEW -p tcp -m tcp --dport 7777 -j ACCEPT

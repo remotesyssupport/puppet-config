@@ -1,0 +1,4 @@
+$IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF -p tcp -m tcp \
+	  --dport 8080 -j ACCEPT
+$IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF -p tcp -m tcp \
+	  --dport 8009 -j ACCEPT

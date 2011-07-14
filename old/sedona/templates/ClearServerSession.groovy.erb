@@ -1,0 +1,77 @@
+#!/usr/bin/env groovy
+
+import groovy.sql.Sql
+
+def expandTo10Chars(String string) {
+   char[] asChars = Arrays.copyOf(string.toCharArray(), 10);
+   Arrays.fill(asChars, string.length(), asChars.length, (char)' ');
+   return new String(asChars);
+} 
+
+def removeServerSessionEntry(String id) {
+   def serverId = expandTo10Chars(id)
+   def sql = Sql.newInstance("jdbc:db2://<%= ds_1 %>:50000/<%= db_name %>",
+                             "<%= user_name %>", "<%= password %>",
+                             "com.ibm.db2.jcc.DB2Driver")
+   sql.execute("""
+    DELETE FROM <%= schema_name %>.SERVERSESSION
+        WHERE serverid = ${serverId}
+""")
+}
+
+def serverIds = [
+   <% server_ids.each do |pair| %>
+      "<%= pair.split(':')[0] %>": "<%= pair.split(':')[1] %>",
+   <% end %>
+]
+
+def write_stdout(str) {
+   System.out.write(str)
+   System.out.flush()
+}
+
+def write_stderr(str) {
+   System.err.write(str)
+   System.err.flush()
+}
+
+def splitToMap(String data) {
+   def fields = [:]
+   data.split(" ").each {
+      pair ->
+      kv = pair.split(":")
+      fields[kv[0]] = kv[1]
+   }
+   return fields
+}
+
+InputStreamReader converter = new InputStreamReader(System.in);
+BufferedReader input = new BufferedReader(converter);
+
+while (true) {
+   write_stdout('READY\n')      // transition from ACKNOWLEDGED to READY
+
+   def line = input.readLine()  // read header line from stdin 
+   write_stderr(line)           // print it out to stderr
+
+   def headers = splitToMap(line)
+
+   Integer len = new Integer(headers['len'])
+   char[] buf = new char[len + 1]
+
+   input.read(buf, 0, len)      // read the event payload
+
+   write_stdout('RESULT 2\nOK') // transition from READY to ACKNOWLEDGED
+
+   if (headers['eventname'] in ['PROCESS_STATE_BACKOFF',
+                                'PROCESS_STATE_STOPPING',
+                                'PROCESS_STATE_EXITED',
+                                'PROCESS_STATE_STOPPED',
+                                'PROCESS_STATE_FATAL']) {
+      def proc = splitToMap(new String(buf))['processname']
+
+      write_stderr("proc is ${proc}")
+      if (serverIds.containsKey(proc))
+         removeServerSessionEntry(serverIds[proc])
+   }
+}

@@ -1,0 +1,4 @@
+for port in 137 138 139 445; do
+    $IPTABLES -A INPUT -m state --state NEW -p tcp -m tcp \
+        --dport $port -j ACCEPT
+done

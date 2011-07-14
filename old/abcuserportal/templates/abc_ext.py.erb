@@ -1,0 +1,32 @@
+# abc_ext.py - Module exposed as "app.ext".
+
+import DB_Jython as DB
+
+import WorkspaceSession
+import FAQs
+
+class AppExt:
+    def __init__(self, session_id, merchant_id, user_session):
+        self.session = {}
+
+        if merchant_id == '0':
+            db = DB.connect('<%= mysql_abc_uri %>', '<%= mysql_abc_user %>', '<%= mysql_abc_password %>')
+        elif merchant_id == '4':
+            db = DB.connect('<%= mysql_adc_uri %>', '<%= mysql_adc_user %>', '<%= mysql_adc_password %>')
+        else:
+            raise Exception('AppExt: unknown merchant ID: %s' % merchant_id)
+        
+        self.workspace = WorkspaceSession.WorkspaceSession(db, session_id,
+                                                           user_session)
+        self.faqs      = FAQs.FAQs(db)
+
+    def on_login(self, user_id):
+        self.workspace.on_login(user_id)
+
+    def on_logout(self):
+        self.workspace.on_logout()
+
+    def close(self):
+        # this method gets called by the dispathcer
+        # to free this application session
+        self.workspace.close()

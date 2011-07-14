@@ -1,0 +1,49 @@
+# Which local IP address should OpenVPN listen on?
+local <%= ipaddress_eth0 %>
+port 1194
+proto udp
+
+# direct these to your generated files 
+cd /etc/openvpn
+
+ca keys/ca.crt
+cert keys/abcvpn.crt
+key keys/abcvpn.key
+dh keys/dh2048.pem
+tls-auth keys/ta.key 0
+cipher AES-128-CBC
+
+# ensure the range of ip addresses you use in the last two arguments
+# of this statement are not in use by either the DHCP server or any
+# other device on your internal network.
+dev tap0
+server-bridge <%= net_cluster %>.1 <%= net_mask %> <%= net_cluster %>.200 <%= net_cluster %>.250
+push "route <%= net_cluster %>.0 <%= net_mask %>"
+push "dhcp-option DOMAIN <%= net_domain %>"
+#push "dhcp-option DNS < % = ipaddress_eth1 % >"
+
+# needed to allow communication to internal network 
+client-to-client 
+keepalive 10 120 
+
+# compression for network speed 
+comp-lzo 
+fragment 1300 
+mssfix 1300 
+
+# some secuurity settings do not use if running server on Windows
+user nobody 
+group nobody 
+
+persist-key 
+persist-tun 
+ifconfig-pool-persist /var/run/openvpn/ipp.txt 
+
+# log file settings 
+status /var/log/openvpn/status.log 
+verb 3 
+
+chroot /var/run/openvpn
+mlock
+
+#crl-verify /etc/openvpn/keys/crl.pem

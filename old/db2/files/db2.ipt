@@ -1,0 +1,3 @@
+# Allow DB2 connections on the private interface only
+$IPTABLES -A INPUT -m state --state NEW -i $PRIVINTF -p tcp -m tcp \
+    --dport 50000 -j ACCEPT 

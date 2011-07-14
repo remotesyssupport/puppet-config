@@ -1,0 +1,36 @@
+# editable_regions.py - Simple content management tool
+
+import DB_Jython as DB
+import fsql
+
+_dbs = {}
+
+_dbinfo = {
+    'abc': ('<%= mysql_abc_uri %>', '<%= mysql_abc_user %>', '<%= mysql_abc_password %>'),
+    'adc': ('<%= mysql_adc_uri %>', '<%= mysql_adc_user %>', '<%= mysql_adc_password %>'),
+}
+
+def _db(db_name):
+    db = None
+    
+    if _dbs.has_key(db_name):
+        try:
+            _dbs[db_name].execute('SELECT 1')
+            db = _dbs[db_name]
+        except:
+            pass
+            
+    if db is None:
+        dsn, user, pw = _dbinfo[db_name]
+        db = DB.connect(dsn, user, pw)
+        _dbs[db_name] = db
+        
+    return db
+    
+def get_editable_region(db_name, name):
+    db = _db(db_name)
+    rows = db.getall(fsql.select('EditableRegion', {'EditableRegionID': name}))
+    if rows:
+        return rows[0].Content
+    else:
+        return '<b style="color: red">[No content found for editable region "%s"]</b>' % name

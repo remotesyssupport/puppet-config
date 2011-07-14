@@ -1,0 +1,28 @@
+# MigrationDocument.py  - Home for migration.document entities
+# This module can be used to query for the results of document migration.
+
+import fsql
+import DB_Jython as DB
+from attrdict import iattrdict
+
+db = DB.connect('<%= migration_uri %>', '<%= migration_user %>', '<%= migration_password %>')
+db.rowdict = iattrdict
+
+def find_by_id(id):
+    sql = fsql.select('Migration.Document', {'DocumentID': id})
+    result = db.getall(sql)
+
+    if len(result) > 0:
+        return result[0]
+    else:
+        return None
+
+def find_by_ids(ids):
+    sql  = fsql.select('Migration.Document', {'DocumentID': ids})
+    rows = db.getall(sql)
+    
+    result = {}
+    for row in rows:
+        result[row.DocumentID] = row
+    
+    return result

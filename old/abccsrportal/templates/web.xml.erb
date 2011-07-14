@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE web-app
+          PUBLIC "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN"
+          "http://java.sun.com/dtd/web-app_2_3.dtd">
+
+<!-- Oct 17, 2002 APR   - updated header from Web Application 2.2 to Web Application 2.3
+                        - grouped all servleted mapping together after servlet definitions
+                          (not sure if this is really needed, remember having to do this
+                          during the test deployment)
+                        - this file defines both the CSR and Admin related app contexts
+     Nov 20, 2003 APR   - replaced all occurences of e:/servers/softlex/deployedapp/waspconfig
+                          with $wasp_config_file_name_*
+     Nov 28, 2003 APR   - created this file in x:/project/ABC_CSRPortal
+     Apr 13, 2004 APR   - configured a hornet dispatcher in this file
+     Apr 23, 2004 APR   - added config params related to FDEBridgeSession
+     May 03, 2004 APR   - introduced $abc_csrportal_root
+     Jul 29, 2004 APR   - introduced $abc_merchant_id
+  -->
+
+<web-app>
+  <!-- The CSR Application (WASP) -->
+
+  <context-param>
+    <param-name>csrapp.merchantid</param-name>
+    <param-value>0</param-value>
+  </context-param>
+
+  <servlet>
+    <servlet-name>CSRApp_Prod_WASP</servlet-name>
+    <servlet-class>adagio.dispatcher.wasp.CSRAppDispatcher</servlet-class>
+    <init-param>
+      <param-name>wasp.filename.configfile</param-name>
+      <param-value><%= path %>/WEB-INF/classes/conf/wasp-csr.conf</param-value>
+    </init-param>
+  </servlet>
+
+  <!-- The CSRDTSXDispatcher Application (WASP) -->
+
+  <servlet>
+    <servlet-name>CSRDTSXDispatcher_Prod_WASP</servlet-name>
+    <servlet-class>adagio.dispatcher.wasp.CSRDTSXDispatcher</servlet-class>
+    <init-param>
+      <param-name>wasp.filename.configfile</param-name>
+      <param-value><%= path %>/WEB-INF/classes/conf/wasp-csr-dtsx.conf</param-value>
+    </init-param>
+  </servlet>
+
+  <!-- The CSR Application (Hornet) -->
+
+  <servlet>
+    <servlet-name>CSRApp_Prod_Hornet</servlet-name>
+    <servlet-class>adagio.dispatcher.hornet.CSRAppDispatcher</servlet-class>
+
+    <!--Hornet dispatcher config -->
+
+    <init-param>        
+      <param-name>hornet.script.path</param-name>
+      <param-value><%= path %>/WEB-INF/classes/dispatches</param-value>
+    </init-param>
+    <init-param>
+      <param-name>hornet.script.checkevery</param-name>
+      <param-value>0</param-value>
+    </init-param>
+    <init-param>        
+      <param-name>hornet.template.path</param-name>
+      <param-value><%= path %>/WEB-INF/classes/templates</param-value>
+    </init-param>
+    <init-param>
+      <param-name>hornet.template.numberformat</param-name>
+      <param-value>0.######</param-value>
+    </init-param>
+    <init-param>
+      <param-name>hornet.session.maxinactiveinterval</param-name>
+      <param-value>6000</param-value>
+    </init-param>
+    <init-param>
+      <param-name>hornet.python.path</param-name>
+      <param-value><%= path %>/WEB-INF/lib:<%= path %>/WEB-INF/classes/abc/csrportal:<%= path %>/WEB-INF/classes/adk/hornet:<%= path %>/WEB-INF/classes/adk/pyutil</param-value>
+    </init-param>
+    <init-param>
+      <param-name>python.path</param-name>
+      <param-value><%= path %>/WEB-INF/lib:<%= path %>/WEB-INF/classes/abc/csrportal:<%= path %>/WEB-INF/classes/adk/hornet:<%= path %>/WEB-INF/classes/adk/pyutil</param-value>
+    </init-param>
+
+    <!--CSRApp specific config -->
+
+    <init-param>
+      <param-name>csrapp.ior.filename</param-name>
+      <param-value><%= path %>/WEB-INF/classes/jndi.properties</param-value>
+    </init-param>
+    
+    
+    <!-- FDEbridge related settings -->
+    
+    <init-param>        
+      <param-name>csrapp.fonts.path</param-name>
+      <param-value><%= doc_path %>/fonts</param-value>
+    </init-param>
+    <init-param>        
+      <param-name>csrapp.processdesigns.path</param-name>
+      <param-value><%= doc_path %>/processdesigns</param-value>
+    </init-param>
+    <init-param>        
+      <param-name>csrapp.prefabdesigns.path</param-name>
+      <param-value><%= doc_path %>/prefabdesigns</param-value>
+    </init-param>
+  </servlet>
+
+  <!-- URI mappings -->
+
+  <servlet-mapping>
+    <servlet-name>CSRApp_Prod_WASP</servlet-name>
+    <url-pattern>/cgi/*</url-pattern>
+  </servlet-mapping>
+
+  <servlet-mapping>
+    <servlet-name>CSRDTSXDispatcher_Prod_WASP</servlet-name>
+    <url-pattern>/dts/cgi/*</url-pattern>
+  </servlet-mapping>
+
+  <servlet-mapping>
+    <servlet-name>CSRApp_Prod_Hornet</servlet-name>
+    <url-pattern>/2/cgi/*</url-pattern>
+  </servlet-mapping>
+</web-app>

@@ -1,0 +1,68 @@
+#-----------------------------------------------------
+#
+# DTSX Server - startup configuration file
+#
+#-----------------------------------------------------
+
+dtsx.server.dir.documents=
+dtsx.server.dir.textlayouts=h:\\textlayoutstyles
+dtsx.server.dir.prefabgraphics=h:\\prefabdesigns
+dtsx.server.dir.imagegraphics=h:\\processdesigns
+dtsx.server.dir.copyrights=h:\\copyrights
+
+dts.server.initsize.activetemplates=8
+dts.server.initsize.passivetemplates=8
+
+#-----------------------------------------------------
+# DTS Server - startup configuration file
+#-----------------------------------------------------
+
+#-----------------------------------------------------
+# I/O queue settings
+#-----------------------------------------------------
+
+dts.server.dir.outqueueroot=z:\\tmp\\dtsx<%= name %>
+
+dts.server.misc.outqueuepostfix=queue
+dts.server.misc.outfileprefix=file
+
+dts.server.initsize.activeoutqueues=64
+dts.server.initsize.passiveoutqueues=64
+
+#-----------------------------------------------------
+# server job queue size limits
+#-----------------------------------------------------
+
+dts.server.maxsize.hosteditcmdjobqueue=1000000
+dts.server.maxsize.hostpdfgenurgentjobqueue=64
+dts.server.maxsize.hostpdfgenlazyjobqueue=64
+
+#-----------------------------------------------------
+# settings for the daemon that closes idle connections
+# (maxsessionidle is in milli seconds)
+#-----------------------------------------------------
+
+dts.server.period.maxsessionidle=12000000
+dts.server.period.idlesessioncloser=100000
+dts.server.size.idlesessionscanburst=20
+
+#-----------------------------------------------------
+# settings for DTSXAdmin to set up and register server
+#-----------------------------------------------------
+
+dts.server.port.localserver=<%= port_localserver %>
+dts.server.flag.joincluster=<%= flag_joincluster %>
+dts.server.period.adminsleeptime.seconds=<%= period_adminsleeptime_seconds %>
+dts.server.hostname.clustermanager=<%= hostname_clustermanager %>
+dts.server.port.clustermanager=<%= port_clustermanager %>
+dts.server.period.pulseinterval=<%= period_pulseinterval %>
+
+#-----------------------------------------------------
+# settings for watermarking process graphics
+#-----------------------------------------------------
+
+dtsx.server.default.watermarktext=<%= default_watermarktext %>
+dtsx.server.default.watermarkfont=<%= default_watermarkfont %>
+dtsx.server.default.watermarkfontstyle=<%= default_watermarktextfontstyle %>
+dtsx.server.distance.watermarkoffset=<%= distance_watermarkoffset %>
+dtsx.server.percentage.watermarkopacity=<%= percentage_watermarkopacity %>

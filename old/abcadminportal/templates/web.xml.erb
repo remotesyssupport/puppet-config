@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE web-app
+          PUBLIC "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN"
+          "http://java.sun.com/dtd/web-app_2_3.dtd">
+
+<!-- Oct 17, 2002	- updated header from Web Application 2.2 to Web Application 2.3
+			- grouped all servleted mapping together after servlet definitions
+			  ( not sure if this is really needed, remember having to do this
+			    during the test deployment)
+			- this file defines both the CSR and Admin related app contexts
+			- replaced all occurences of e:/apps/abcsys/conf with e:/servers/softlex/deployedapp/waspconfig
+     Nov 20, 2003 APR	- replaced all occurences of e:/servers/softlex/deployedapp/waspconfig
+     			  with $wasp_config_file_name_*
+     Nov 28, 2003 APR	- created this file in x:/project/ABC_AdminPortal
+-->
+
+<web-app>
+	<!-- The Admin Application -->
+	
+	<servlet>
+		<servlet-name>AdminApp</servlet-name>
+		<servlet-class>adagio.dispatcher.wasp.AdminAppDispatcher</servlet-class>
+		<init-param>
+			<param-name>wasp.filename.configfile</param-name>
+			<param-value>${catalina.home}/webapps/admin/WEB-INF/classes/conf/wasp-admin.conf</param-value>
+	        </init-param>
+	</servlet>
+
+	<servlet-mapping>
+		<servlet-name>AdminApp</servlet-name>
+		<url-pattern>/cgi/*</url-pattern>
+	</servlet-mapping>
+</web-app>

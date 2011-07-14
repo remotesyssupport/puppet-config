@@ -1,0 +1,8 @@
+[program:ProofDeliveryServer]
+command=/usr/bin/wine 'c:\servers\jdk1.6\bin\java.exe' -cp 'z:\usr\adagio\Adagio_Lib-<%= adagio_version %>-client-full.jar' -DJINTEGRA_NATIVE_MODE -Dadminserver.serverid=<%= serverid %> '-Dadminserver.configfile=z:\usr\adagio\jndi.properties' adagio.server.proofdelivery.ProofDeliveryAdminServer
+directory=/usr/indesign        ; directory to cwd to before exec (def no cwd)
+priority=400                   ; the relative start priority (default 999)
+startsecs=30                   ; number of secs prog must stay running (def. 1)
+user=indesign                     ; setuid to this UNIX account to run the program
+redirect_stderr=true          ; redirect proc stderr to stdout (default false)
+environment=DISPLAY=':<%= screen %>',WINEPREFIX='/usr/indesign/gridsetter',WINEDEBUG='err-ole'

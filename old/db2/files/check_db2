@@ -1,0 +1,197 @@
+#!/usr/bin/env python
+
+# For this script to work, the following line must be in /etc/sudoers:
+#
+# nagios ALL=(db2inst1) NOPASSWD: /usr/db2/db2inst1/sqllib/bin/db2
+
+import os
+import sys
+import getopt
+import re
+
+def usage():
+    print """Usage: check_db2 [-h|--help] \
+[-u NAME] [-d NAME] [-t NAME] [-w NUM] [-c NUM] [-i NUM]"""
+    sys.exit(3)
+
+try:
+    options, args = getopt.getopt(sys.argv[1:],
+        "ht:d:u:w:c:i:",
+        "--help",
+        )
+except getopt.GetoptError:
+    usage()
+    sys.exit(3)
+
+criterion = None
+databaseName = None
+userName = "db2inst1"
+warnLimit = 10
+criticalLimit = 20
+indexNum = 1
+
+for name, value in options:
+    if name in ("-h", "--help"):
+        usage()
+    if name in ("-d"):
+        databaseName = value
+    elif name in ("-u"):
+        userName = value
+    elif name in ("-t"):
+        criterion = value
+    elif name in ("-w"):
+        warnLimit = value
+    elif name in ("-c"):
+        criticalLimit = value
+    elif name in ("-i"):
+        indexNum = value
+
+if databaseName is None:
+    print "DB2 UNKNOWN: Could not determine database name"
+    sys.exit(3)
+if userName is None:
+    print "DB2 UNKNOWN: Could not determine user name"
+    sys.exit(3)
+
+def db2cmd(text):
+    try:
+        return os.popen("sudo -H -u %s /usr/db2/db2inst1/sqllib/bin/db2 -x %s" %
+                        (userName, text))
+    except Exception:
+        print "%s UNKNOWN: Error while running command: %s" % text
+        sys.exit(3)
+
+def tablespace_details(index):
+    status = db2cmd("LIST TABLESPACES SHOW DETAIL")
+    tablespaces = []
+    i = 0
+    for line in status.readlines():
+        match = re.search("Tablespace ID.*= ([0-9]+)", line)
+        if match:
+            i = int(match.group(1))
+            tablespaces.append({})
+
+        match = re.match(" Name.*= (.+)", line)
+        if match:
+            tablespaces[i]["name"] = match.group(1)
+            
+        match = re.match(" Total pages.*= ([0-9]+)", line)
+        if match:
+            tablespaces[i]["total"] = int(match.group(1))
+            
+        match = re.match(" Useable pages.*= ([0-9]+)", line)
+        if match:
+            tablespaces[i]["useable"] = int(match.group(1))
+            
+        match = re.match(" Used pages.*= ([0-9]+)", line)
+        if match:
+            tablespaces[i]["used"] = int(match.group(1))
+            
+        match = re.match(" Free pages.*= ([0-9]+)", line)
+        if match:
+            tablespaces[i]["free"] = int(match.group(1))
+    return tablespaces[index]
+
+def apps_waiting():
+    status = db2cmd("SELECT appl_status FROM SYSIBMADM.SNAPAPPL_INFO")
+    apps = 0
+    waiting = 0
+    for line in status.readlines():
+        if re.match("LOCKWAIT", line):
+            waiting += 1
+        apps += 1
+    status.close()
+    return (apps, waiting)
+    
+db2cmd("CONNECT TO %s" % databaseName).close()
+
+if criterion is None:
+    print "DB2 OK: %s accepting connections" % databaseName
+
+elif criterion == "apps":
+    (apps, waiting) = apps_waiting()
+    if apps > int(criticalLimit):
+        print "DB2 CRITICAL: %d apps running" % apps
+        sys.exit(2)
+    elif apps > int(warnLimit):
+        print "DB2 WARNING: %d apps running" % apps
+        sys.exit(1)
+    else:
+        print "DB2 OK: %d apps running" % apps
+        sys.exit(0)
+
+elif criterion == "locks":
+    (apps, waiting) = apps_waiting()
+    perc = (float(waiting) / float(apps)) * 100.0
+    if perc > float(criticalLimit):
+        print "DB2 CRITICAL: %d apps waiting (%0.2f%%)" % (waiting, perc)
+        sys.exit(2)
+    elif perc > float(warnLimit):
+        print "DB2 WARNING: %d apps waiting (%0.2f%%)" % (waiting, perc)
+        sys.exit(1)
+    else:
+        print "DB2 OK: %d apps waiting (%0.2f%%)" % (waiting, perc)
+        sys.exit(0)
+
+elif criterion == "space":
+    tablespace = tablespace_details(int(indexNum))
+    
+    perc = (float(tablespace["free"]) / float(tablespace["total"])) * 100.0
+    if perc < float(criticalLimit):
+        status = "CRITICAL"
+        statusCode = 2
+    elif perc < float(warnLimit):
+        status = "WARNING"
+        statusCode = 1
+    else:
+        status = "OK"
+        statusCode = 0
+
+    print "DB2 %s: free space: %s %d pages (%0.2f%%)" % \
+        (status, tablespace["name"], tablespace["free"], perc)
+    sys.exit(statusCode)
+
+elif criterion == "health":
+    health = db2cmd("GET HEALTH SNAPSHOT FOR DB ON %s" % databaseName)
+    name = "UNKNOWN"
+    value = "??"
+    unit = ""
+    alerts = {}
+    found = False
+    for line in health.readlines():
+        match = re.search("Indicator Name.*= (.*)", line)
+        if match:
+            name = match.group(1)
+
+        match = re.search("Value.*= (.*)", line)
+        if match:
+            value = match.group(1)
+
+        match = re.search("Unit.*= (.*)", line)
+        if match:
+            unit = match.group(1)
+
+        match = re.search("Alert state.*= (.*)", line)
+        if match:
+            found = True
+            if match.group(1) != "Normal":
+                alerts[match.group(1)] = (name, value, unit)
+                unit = ""
+
+    if not found:
+        print "DB2 UNKNOWN: Health Monitor not available"
+        sys.exit(3)
+
+    if alerts:
+        if alerts.has_key("Alarm"):
+            print "DB2 CRITICAL: %s: %s %s" % alerts["Alarm"]
+            sys.exit(2)
+        elif alerts.has_key("Attention"):
+            print "DB2 WARNING: %s: %s %s" % alerts["Attention"]
+            sys.exit(1)
+        elif alerts.has_key("Warning"):
+            print "DB2 WARNING: %s: %s %s" % alerts["Warning"]
+            sys.exit(1)
+    else:
+        print "DB2 OK: Health monitor says Normal"
+        sys.exit(0)

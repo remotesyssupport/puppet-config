@@ -1,0 +1,8 @@
+[eventlistener:ClearServerSession]
+command=/usr/bin/groovy /usr/adagio/ClearServerSession.groovy
+directory=/tmp                 ; directory to cwd to before exec (def no cwd)
+priority=10                    ; the relative start priority (default 999)
+startsecs=30                   ; number of secs prog must stay running (def. 1)
+user=root                      ; setuid to this UNIX account to run the program
+events=PROCESS_STATE_BACKOFF,PROCESS_STATE_STOPPING,PROCESS_STATE_EXITED,PROCESS_STATE_STOPPED,PROCESS_STATE_FATAL
+environment=GROOVY_HOME='/usr/share/groovy',CLASSPATH='/usr/adagio/Adagio_Lib-<%= adagio_version %>-client-full.jar:/usr/adagio/db2jcc_license_cu.jar'

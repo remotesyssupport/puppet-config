@@ -1,0 +1,38 @@
+NameVirtualHost *:80
+NameVirtualHost *:443
+
+<VirtualHost *:80>
+    Include "/etc/httpd/<%= title %>_body.conf"
+
+    # inform downstream reverse proxied servers of the origin protocol
+    <LocationMatch "^/(.*)">
+        RequestHeader set x-forwarded-protocol  "http"
+    </LocationMatch>
+
+    #RewriteCond %{HTTP_HOST} !^<%= server_name %>$
+    #RewriteRule ^/(.*) http://<%= server_name %>/$1 [L,R]
+</VirtualHost>                                  
+
+<VirtualHost *:443>
+    Include "/etc/httpd/<%= title %>_body.conf"
+
+    # inform downstream reverse proxied servers of the origin protocol
+    <LocationMatch "^/(.*)">
+        RequestHeader set x-forwarded-protocol  "https"
+    </LocationMatch>
+
+    RewriteCond %{HTTP_HOST} !^<%= server_name %>$
+    RewriteRule ^/(.*) https://<%= server_name %>/$1 [L,R]
+
+    #----- SSL configuration
+    SSLEngine on
+    SSLCipherSuite ALL:!ADH:!EXPORT56:RC4+RSA:+HIGH:+MEDIUM:+LOW:+SSLv2:+EXP:+eNULL
+    SSLCertificateFile      /etc/pki/tls/certs/<%= title %>.crt
+    SSLCertificateChainFile /etc/pki/tls/certs/<%= title %>.ca-bundle
+    SSLCertificateKeyFile   /etc/pki/tls/private/<%= title %>.key
+    
+    BrowserMatch ".*MSIE.*" nokeepalive ssl-unclean-shutdown downgrade-1.0 force-response-1.0
+</VirtualHost>                                  
+    
+ErrorDocument 500 /s/500-notice.html
+ErrorDocument 503 /s/503-notice.html

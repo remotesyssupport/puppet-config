@@ -1,0 +1,14 @@
+RewriteEngine On
+
+RewriteRule ^/drupal/(.*)$ https://<%= gw_1 %>/$1 [L]
+RewriteRule ^/(.*)$        https://<%= gw_1 %>/drupal/$1 [L]
+
+#ProxyRequests Off
+
+<Proxy *>
+    Order deny,allow
+    Allow from all
+</Proxy>
+
+ProxyPass        /drupal/ http://<%= gw_1 %>/drupal/
+ProxyPassReverse /drupal/ http://<%= gw_1 %>/drupal/

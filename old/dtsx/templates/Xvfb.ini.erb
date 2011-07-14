@@ -1,0 +1,7 @@
+[program:Xvfb<%= screen %>]
+command=/usr/bin/Xvfb :<%= screen %> -pn -nolisten tcp -audit 4 -screen 0 1024x768x24
+process_name=%(program_name)s
+directory=/usr/indesign       ; directory to cwd to before exec (def no cwd)
+priority=100                   ; the relative start priority (default 999)
+user=indesign                     ; setuid to this UNIX account to run the program
+redirect_stderr=true          ; redirect proc stderr to stdout (default false)

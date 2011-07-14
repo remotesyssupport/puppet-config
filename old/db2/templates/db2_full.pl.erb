@@ -1,0 +1,324 @@
+#!/usr/bin/perl
+
+#-----------------------------------------------------------------------------------
+# HOT ONLINE BACKUP DB2 - Backs up specified databases from a DB2 instance and
+#	removes backup files that are older than a specified number of days. This
+#	script is designed to be used as a cron job.
+#-----------------------------------------------------------------------------------
+#
+# This script was originally created by the Medusa project:
+# http://www.lsc-group.phys.uwm.edu/beowulf/medusa/
+
+#-----------------------------------------------------------------------------------
+# CONFIGURATION CONSTANTS
+#-----------------------------------------------------------------------------------
+use vars qw(
+	     @ADMIN_EMAIL_ADDRS
+	     @DATABASES
+	     $LOG
+	     $FROM_EMAIL
+	     $SERVER_NAME
+	     $BACKUP_DIR
+	     $URL
+	     $DB2_DIR
+	     $DAYS_TO_KEEP_BACKUPS
+	     $DAYS_TO_KEEP_TRANSACTION_LOGS);
+
+#--------------------------------------------------------------------------------------
+# EMAIL SENDER
+#--------------------------------------------------------------------------------------
+
+# Send the results of the backup to all addresses specified in @ADMIN_EMAIL_ADDRS
+@ADMIN_EMAIL_ADDRS = ('root@localhost' );
+
+# $FROM_EMAIL specifies the from email address for the backup summery email
+$FROM_EMAIL = 'db2inst1@<%= ds_1 %>';
+
+#List each of the databases to be included in nightly backup
+@DATABASES = qw( <%= db_name %> );
+
+# Backups older than $DAYS_TO_KEEP_BACKUPS will be deleted automagically
+$DAYS_TO_KEEP_BACKUPS = 28;
+
+# Transaction logs older than $DAYS_TO_KEEP_TRANSACTION_LOGS will be deleted
+$DAYS_TO_KEEP_TRANSACTION_LOGS = 90;
+
+# Set the location and filename for the log
+$LOG = '<%= doc_path %>/db2/logs/db2backup-' . f_getDateYYYYMMDD() . '.log';
+
+#The name of the server we are backing up
+$SERVER_NAME = "<%= ds_1 %>";
+
+#Location of the backup files:
+$BACKUP_DIR = '<%= doc_path %>/db2/backups/';
+
+#Path to the DB2 executables
+$DB2_DIR = '/usr/db2';
+
+#Set up the environment
+# DB2 relys on evironment variables which are not set by cron
+# We need to set them explicitly.
+$ENV{SHELL}='/bin/bash';
+$ENV{DB2DIR}='/usr/db2';
+$ENV{DB2INSTANCE}='db2inst1';
+
+#Uncomment following to write the environment variables to the log
+#system "set >> $LOG";
+
+#-----------------------------------------------------------------------------------
+# MAIN - This section of code controls the flow and calls functions to which all
+#	 the real work.
+#-----------------------------------------------------------------------------------
+
+# log the begining of the run
+f_logEntry("\n\n------------------------------\nBeginning database backup.");
+
+# $success is 1 if all functions return true, 0 if any of them fail
+my $success = 1;
+
+# first get the databases to backup
+my @databases = f_getDatabases();
+
+# Backup the databases
+$success = f_backupDatabases(@databases);
+
+# delete backups older than $DAYS_TO_KEEP_BACKUP
+$success = $success * f_purgeOldBackupFiles(@databases);
+
+# delete transaction logs older than $DAYS_TO_KEEP_TRANSACTION_LOGS
+$success = $success * f_purgeOldTransactionLogs(@databases);
+
+# notify the administrators of results
+f_emailAdministrators($success, @ADMIN_EMAIL_ADDRS);
+
+# log the end of the run
+f_logEntry("Database backup completed.\n------------------------------");
+
+#-----------------------------------------------------------------------------------
+# f_getDatabases
+#-----------------------------------------------------------------------------------
+# connects to DB2, queries the names of the databases
+# and returns an array with the database names.
+#-----------------------------------------------------------------------------------
+sub f_getDatabases {
+
+  #for now just return the databases from the the program constant
+  # - later may make this dynamic to query db for list of db's
+  return @DATABASES;
+}
+
+#-----------------------------------------------------------------------------------
+# f_backupDatabases
+#-----------------------------------------------------------------------------------
+# Backs up each of the databases passed to it as an array
+#-----------------------------------------------------------------------------------
+sub f_backupDatabases {
+
+  my $success = 1;		#true
+
+  foreach my $db (@_) {
+
+    #Build the DB2 command to back up the databases
+    my $cmd = "$DB2_DIR/bin/db2 \"backup database $db ONLINE to $BACKUP_DIR " .
+      "with 2 buffers buffer 1000 compress without prompting \" ";
+    print $cmd,"\n";
+
+    #Run the command and write the output to the LOG
+    if (system $cmd . ">> $LOG") #backup command fails
+      {
+	f_logEntry("Backup failed for database $db");
+	$success = 0;		#false
+      } else {			#Backup completed with return code 0
+	f_logEntry("Completed backup of $db.");
+      }
+  }
+  return $success;
+}
+
+#-----------------------------------------------------------------------------------
+# f_purgeOldBackupFiles
+#-----------------------------------------------------------------------------------
+# Removes backupfiles for each database (databases passed in as an array).
+# Files are removed if they are older than $DAYS_TO_KEEP_BACKUPS days
+#-----------------------------------------------------------------------------------
+sub f_purgeOldBackupFiles{
+
+  foreach my $db (@_) {
+    if (not opendir(DIR, $BACKUP_DIR)) {
+      f_logEntry("Failed to open backup dir to remove old backup files.");
+      return 0;			#false
+    }
+
+    #get list of files begining with database name
+    my @dbFiles = grep {/^$db\./i} readdir(DIR);
+    f_logEntry("Found " . scalar(@dbFiles) . " backups for $db.");
+
+    #if there are 2 or fewer backups for a db, don't delete em
+    next if (scalar(@dbFiles) < 2);
+
+    #Sort the directory list
+    @dbFiles = sort @dbFiles;
+
+    #pop off the most recent backup so at least 1 exists
+    pop(@dbFiles);
+
+    foreach my $file (@dbFiles) {
+      f_logEntry("Checking to see if $file is older than $DAYS_TO_KEEP_BACKUPS days.");
+      #if file is older than $DAYS_TO_KEEP_BACKUPS then delete it
+      my $creationDate = (stat($BACKUP_DIR . $file))[9];
+      my $deleteDate = time - $DAYS_TO_KEEP_BACKUPS*24*60*60;
+      if ($creationDate < $deleteDate) {
+	if (unlink($BACKUP_DIR . $file)) {
+	  f_logEntry("Deleted file $BACKUP_DIR$file.\n");
+	} else {
+	  f_logEntry("Failed to delete $BACKUP_DIR$file.");
+	}
+      }
+    }
+    closedir(DIR);
+  }
+  return 1;			#true
+}
+
+#-----------------------------------------------------------------------------------
+# f_purgeOldTransactionLogs
+#-----------------------------------------------------------------------------------
+# Removes transaction logs for each database passed in as an array
+# if the file is older than $DAYS_TO_KEEP_TRANSACTION_LOGS days.
+# The directory for the logs is extracted from the databases configuration.
+#-----------------------------------------------------------------------------------
+sub f_purgeOldTransactionLogs{
+
+  #$success will be either 1 for true or 0 for false.
+  my $success = 1;		#Lets start out optimistic
+
+  foreach my $db (@_) {
+
+    #Get the location of the transaction logs from the db2 configuration
+    my $cmd = "$DB2_DIR/bin/db2 get db cfg for $db|grep \"Path to log files\"";
+
+    #Execute the command and store it in variable
+    #f_logEntry($cmd);
+    #system $cmd . ">> $LOG"; #Uncomment to copy the results of the command to the log
+    my $txt = `$cmd`;
+    my @results = split("=", $txt);
+
+    #The backup dir is the 2nd element of the array, element 1
+    my $transactionLogDir = $results[1];
+    chomp $transactionLogDir;
+
+    #Clean off tabs and spaces
+    $transactionLogDir =~ s/(\t|\n| )//ig;
+
+    #Now read the backup dir
+    if (not opendir(DIR, $transactionLogDir)) {
+      f_logEntry("Failed to open transaction log dir $transactionLogDir for DB $db.");
+      $success = 0;		#false
+      next;
+    }
+
+    #get list of log files for the database
+    my @logFiles = grep {/^S\d+\.LOG/i} readdir(DIR);
+    f_logEntry("Found " . scalar(@logFiles) . " transaction logs for $db in $transactionLogDir.");
+
+    #iterate throught the files and delete the files that are older than days to keep
+    foreach my $file (@logFiles) {
+      #if file is older than $DAYS_TO_KEEP_TRANSACTION_LOGS then delete it
+
+      #Use stat to determine date file was last changed
+      my $modificationDate = (stat($transactionLogDir . $file))[9];
+      my $deleteDate = time - $DAYS_TO_KEEP_TRANSACTION_LOGS*24*60*60;
+
+      #If the last modification was before the delete date, then delete it (unlink it)
+      if ($modificationDate < $deleteDate) {
+	if (unlink($transactionLogDir . $file)) {
+	  f_logEntry("Deleted $transactionLogDir$file - modified @ $modificationDate.\n");
+	} else {
+	  f_logEntry("Failed to delete $transactionLogDir$file. Check file permissions.");
+	  $success = 0;		#false
+	}
+      }
+    }
+    closedir(DIR);
+  }
+  return $success;
+}
+
+#-----------------------------------------------------------------------------------
+# f_notifyAdministrators
+#-----------------------------------------------------------------------------------
+# Sends message to administrators when backup has completed.
+#-----------------------------------------------------------------------------------
+sub f_emailAdministrators {
+  my ($success, @emails) = @_;
+  my($subject,$message);
+
+  if ($success) {
+    $subject = "$SERVER_NAME database backup completed";
+    $message = "Backups completed on " . localtime() . ". No errors were reported.\n\n" .
+      "------------------------------------------\n" .
+	"The backup files are in directory $BACKUP_DIR.\n\n" .
+	  "For additional information, review the log $URL";
+  } else {
+    $subject = "Errors occurred during $SERVER_NAME backup.\n";
+    $message = "Errors occurred during the backup completed on " . localtime() . ".\n\n" .
+      "------------------------------------------\n" .
+	"The backup files are in directory $BACKUP_DIR.\n\n" .
+	  "For additional information, review the log $URL";
+  }
+  unless($success) {
+    $subject = "Errors occurred during $SERVER_NAME backup.";
+  }
+
+  #foreach my $admin_email_addr (@emails) {
+  #  my $email = "From: $FROM_EMAIL\nTo: $admin_email_addr\nSubject: $subject\n\n$message\n";
+  #  open(SENDMAIL, "|/usr/bin/sendmail -i -t ") or die "Can't fork for sendmail.";
+  #  print SENDMAIL $email;
+  #  close(SENDMAIL);
+  #}
+}
+
+#-----------------------------------------------------------------------------------
+# f_logEntry
+#-----------------------------------------------------------------------------------
+# Adds the string passed in to the log with a timestamp
+#-----------------------------------------------------------------------------------
+sub f_logEntry{
+  my $str = shift;
+  open LOG, '>>' . $LOG or die "Couldn't open $LOG";
+  print LOG "$str @ " . localtime() . "\n";
+  print "$str @ " . localtime() . "\n";
+  close LOG;
+  return 1;
+}
+
+#-----------------------------------------------------------------------------------
+# f_getDateYYYYMMDD
+#-----------------------------------------------------------------------------------
+# Returns date as YYYYMMDD
+#-----------------------------------------------------------------------------------
+sub f_getDateYYYYMMDD{
+  my %month = (
+	       Jan => '01',
+	       Feb => '02',
+	       Mar => '03',
+	       Apr => '04',
+	       May => '05',
+	       Jun => '06',
+	       Jul => '07',
+	       Aug => '08',
+	       Sep => '09',
+	       Oct => '10',
+	       Nov => '11',
+	       Dec => '12'
+	      );
+  my @timeparts = split(" ", localtime());
+
+  #add in leading 0 for day if needed
+  if ($timeparts[2]<10) {
+    $timeparts[2] = "0" . $timeparts[2];
+  }
+  ;
+
+  return "$timeparts[4]$month{$timeparts[1]}$timeparts[2]";
+}

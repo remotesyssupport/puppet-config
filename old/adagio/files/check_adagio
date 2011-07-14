@@ -1,0 +1,83 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import getopt
+import re
+import string
+
+def usage():
+    print """Usage: check_adagio [-h|--help] \
+[-s NAME] [-p PRODUCT]"""
+    sys.exit(3)
+
+try:
+    options, args = getopt.getopt(sys.argv[1:],
+        "hs:p:",
+        "--help",
+        )
+except getopt.GetoptError:
+    usage()
+    sys.exit(3)
+
+serverName = None
+
+for name, value in options:
+    if name in ("-h", "--help"):
+        usage()
+    if name in ("-s"):
+        serverName = value
+    if name in ("-p"):
+        productName = value
+
+if serverName is None:
+    print "ADAGIO UNKNOWN: Could not determine server name"
+    sys.exit(3)
+if productName is None:
+    print "ADAGIO UNKNOWN: Could not determine product name"
+    sys.exit(3)
+
+os.environ['GROOVY_HOME'] = '/usr/share/groovy'
+#classpath = (string.join(os.listdir('/usr/adagio'), ':') +
+#             ':/usr/jboss/client/mail.jar' +
+#             ':/usr/jboss/client/jbossall-client.jar' +
+#             ':/usr/jboss/client/jboss-javaee.jar')
+classpath = '/mnt/data/Adagio_Lib-2.9.2-SNAPSHOT-client-full.jar'
+
+fd = os.popen("groovy -cp %s -d /usr/jboss/bin/adagioTest.groovy %s %s" %
+              (classpath, serverName, productName))
+
+lastState = "Starting adagioTest"
+
+for line in fd.readlines():
+    line = line[:-1]
+
+    if re.match("Setting system properties", line):
+        lastState = line
+    elif re.match("Getting initial context", line):
+        lastState = line
+    elif re.match("Initializing Address", line):
+        lastState = line
+    elif re.match("Get UserSessionHOME", line):
+        lastState = line
+    elif re.match("Creating MerchantVALUE", line):
+        lastState = line
+    elif re.match("Getting UserSession", line):
+        lastState = line
+    elif re.match("Logging in as jdoe", line):
+        lastState = line
+    elif re.match("Getting DocumentAddUpdateSession", line):
+        lastState = line
+    elif re.match("Opening old document view", line):
+        lastState = line
+    elif re.match("Document closed", line):
+        lastState = None
+
+fd.close()
+
+if lastState is None:
+    print "ADAGIO OK: Handling documents"
+    sys.exit(0)
+else:
+    print "ADAGIO CRITICAL: %s" % lastState
+    sys.exit(2)

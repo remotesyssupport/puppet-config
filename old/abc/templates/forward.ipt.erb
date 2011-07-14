@@ -1,0 +1,14 @@
+# jww (2010-01-11): This file is defunct, but remains here to document how to
+# do this should it ever become necessary.
+
+# Any port connection to abc-p1-srv-2 on 80 or 443 get redirected into the
+# Tomcat VM
+for port in 80 443; do
+    $IPTABLES -t nat -A PREROUTING -i $PUBINTF -p tcp -m tcp --dport $port \
+    	      -j DNAT --to-destination <%= ws_1_ip %>:$port
+done
+
+$IPTABLES -t nat -A POSTROUTING -s <%= ws_1_ip %> -j SNAT --to-source $PUBADDR
+
+$IPTABLES -A FORWARD -i $PRIVINTF -o $PUBINTF  -j ACCEPT
+$IPTABLES -A FORWARD -i $PUBINTF  -o $PRIVINTF -j ACCEPT

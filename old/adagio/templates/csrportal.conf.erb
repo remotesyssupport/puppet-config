@@ -1,0 +1,85 @@
+RewriteEngine On
+
+#RewriteLog "/tmp/rewrite.log"
+#RewriteLogLevel 3
+
+#RewriteCond %{SERVER_PORT} !^443$
+#RewriteCond %{REQUEST_URI} !^/ui/
+#RewriteRule ^/(.*)$ https://<%= gateway %>/$1 [R,L]
+RewriteCond %{SERVER_PORT} !^80$
+RewriteRule ^/(.*)$ http://<%= gateway %>/$1 [R,L]
+
+ProxyRequests Off
+
+<Proxy *>
+    Order deny,allow
+    Allow from all
+</Proxy>
+
+ExpiresActive On
+
+<Directory "/srv/csr">
+    ExpiresDefault A0
+    <FilesMatch "\.(ico|flv|jpg|jpeg|png|gif|js|JS|swf|html|htm)$">
+        Header set Cache-Control "max-age=2592000, public"
+        ExpiresDefault A2592000
+    </FilesMatch>
+    <FilesMatch "blank\.htm$">
+        Header set Cache-Control "max-age=2592000, public"
+        ExpiresDefault A2592000
+    </FilesMatch>
+    #<FilesMatch "empty\.css">
+    #    Header set Cache-Control "no-cache"
+    #    ExpiresDefault A0
+    #</FilesMatch>
+    #<FilesMatch "\.css">
+    #    Header set Cache-Control "max-age=2592000, private"
+    #    ExpiresDefault A2592000
+    #</FilesMatch>
+</Directory>
+
+# directives to serve CSRPortal for FDE
+
+RewriteRule ^/csr/fde/cmd/open([0-9]+).html                               http://<%= host %>:8080/csr/2/cgi/fde/open.hd?document_id=$1 [P,L]
+RewriteRule ^/csr/fde/cmd/keep_open([0-9]+).html                          http://<%= host %>:8080/csr/2/cgi/fde/open.hd?document_id=$1&mode=keep_open [P,L]
+RewriteRule ^/csr/fde/cmd/view([0-9]+)_([0-9]).html                       http://<%= host %>:8080/csr/2/cgi/fde/open.hd?document_id=$1&mode=view&section_num=$2 [P,L]
+RewriteRule ^/csr/fde/document/Document.xml                               http://<%= host %>:8080/csr/2/cgi/fde/read.hd [P,L]
+RewriteRule ^/csr/fde/document/Preview.cmd                                http://<%= host %>:8080/csr/2/cgi/fde/preview.hd [P,L]
+RewriteRule ^/csr/fde/document/Preview.pdf                                http://<%= host %>:8080/csr/2/cgi/fde/preview_pdf.hd [P,L]
+RewriteRule ^/csr/fde/document/Save.cmd                                   http://<%= host %>:8080/csr/2/cgi/fde/save.hd [P,L]
+RewriteRule ^/csr/fde/document/Done.cmd                                   http://<%= host %>:8080/csr/2/cgi/fde/done.hd [P,L]
+RewriteRule ^/csr/fde/document/DoneDialog_Yes.cmd                         http://<%= host %>:8080/csr/2/cgi/fde/done_dialog_yes.hd [P,L]
+RewriteRule ^/csr/fde/document/DoneDialog_No.cmd                          http://<%= host %>:8080/csr/2/cgi/fde/done_dialog_no.hd [P,L]
+RewriteRule ^/csr/fde/document/Close.cmd                                  http://<%= host %>:8080/csr/2/cgi/fde/close.hd [P,L]
+RewriteRule ^/csr/fde/font/Font(.*).swf                                   http://<%= host %>:8080/csr/2/cgi/fde/getfont.hd?int:slot_no=$1 [P,L]
+RewriteRule ^/csr/fde/font/Fonts.xml                                      http://<%= host %>:8080/csr/2/cgi/fde/fonts.hd [P,L]
+RewriteRule ^/csr/fde/externalgraphic/secured/Catalog.xml                 http://<%= host %>:8080/csr/2/cgi/fde/external_secured_catalog.hd [P,L]
+RewriteRule ^/csr/fde/externalgraphic/secured/previewimage/(.+).jpg       http://<%= host %>:8080/csr/2/cgi/fde/external_secured_preview.hd?id=$1 [P,L]
+RewriteRule ^/csr/fde/externalgraphic/secured/editorimage/(.+).jpg        http://<%= host %>:8080/csr/2/cgi/fde/external_secured_editor.hd?id=$1 [P,L]
+RewriteRule ^/csr/fde/externalgraphic/secured/ExternalGraphic_(.+).xml    http://<%= host %>:8080/csr/2/cgi/fde/external_secured_xml.hd?id=$1 [P,L]
+RewriteRule ^/csr/fde/externalgraphic/unsecured/Catalog.xml               http://<%= host %>:8080/csr/2/cgi/fde/external_unsecured_catalog.hd [P,L]
+RewriteRule ^/csr/fde/externalgraphic/unsecured/previewimage/(.+).jpg     http://<%= host %>:8080/csr/2/cgi/fde/external_unsecured_preview.hd?id=$1 [P,L]
+RewriteRule ^/csr/fde/externalgraphic/unsecured/editorimage/(.+).jpg      http://<%= host %>:8080/csr/2/cgi/fde/external_unsecured_editor.hd?id=$1 [P,L]
+RewriteRule ^/csr/fde/externalgraphic/unsecured/ExternalGraphic_(.+).xml  http://<%= host %>:8080/csr/2/cgi/fde/external_unsecured_xml.hd?id=$1 [P,L]
+RewriteRule ^/csr/fde/prefabgraphic/secured/Catalog.xml                   http://<%= host %>:8080/csr/2/cgi/fde/prefab_secured_catalog.hd [P,L]
+RewriteRule ^/csr/fde/prefabgraphic/secured/previewimage/(.+).jpg         http://<%= host %>:8080/csr/2/cgi/fde/prefab_secured_preview.hd?id=$1 [P,L]
+RewriteRule ^/csr/fde/prefabgraphic/secured/editorimage/(.+).jpg          http://<%= host %>:8080/csr/2/cgi/fde/prefab_secured_editor.hd?id=$1 [P,L]
+RewriteRule ^/csr/fde/prefabgraphic/unsecured/Catalog.xml                 http://<%= host %>:8080/csr/2/cgi/fde/prefab_unsecured_catalog.hd [P,L]
+
+#AliasMatch  ^/csr/fde(.*)      <%= statics %>/fde/$1
+
+# directives to serve CSRPortal for ABC (Post Migration Support Module)
+AliasMatch  ^/preprocessed/(.*)     <%= doc_path %>/ABCSYS_ARCHIVED_DATA/DOCUMENTS/PREMIGRATED/$1
+AliasMatch  ^/original/(.*)         <%= doc_path %>/ABCSYS_ARCHIVED_DATA/DOCUMENTS/ORIGINAL/INDESIGN/$1
+AliasMatch  ^/original_pdf/(.*)     <%= doc_path %>/ABCSYS_ARCHIVED_DATA/DOCUMENTS/ORIGINAL/PDF/$1
+AliasMatch  ^/current/(.*)          <%= doc_path %>/documents/$1
+
+RewriteRule ^/csr/cgi/(.*)     http://<%= host %>:8080/csr/cgi/$1 [P,L]
+RewriteRule ^/csr/dts/cgi/(.*) http://<%= host %>:8080/csr/dts/cgi/$1 [P,L]
+RewriteRule ^/csr/2/cgi/(.*)   http://<%= host %>:8080/csr/2/cgi/$1 [P,L]
+
+# directives to serve CSRPortal
+RewriteRule ^/csr$             http://<%= host %>:8080/csr/ [P,L]
+RewriteRule ^/csr(.*)          http://<%= host %>:8080/csr$1 [P,L]
+
+#AliasMatch  ^/csr(.*)          <%= statics %>/$1

@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import getopt
+import re
+import urllib2
+
+def usage():
+    print """Usage: check_abc [-h|--help] \
+[-s NAME]"""
+    sys.exit(3)
+
+try:
+    options, args = getopt.getopt(sys.argv[1:],
+        "hs:",
+        "--help",
+        )
+except getopt.GetoptError:
+    usage()
+    sys.exit(3)
+
+serverName = None
+
+for name, value in options:
+    if name in ("-h", "--help"):
+        usage()
+    if name in ("-s"):
+        serverName = value
+
+if serverName is None:
+    print "ABC UNKNOWN: Could not determine server name"
+    sys.exit(3)
+
+page = urllib2.urlopen('http://%s/user/cgi/index.hd' % serverName)
+
+lastState = 'Cannot load'
+
+try:
+    for line in page.readlines():
+        if re.search('American Business Card &reg; is your resource', line):
+            lastState = None
+            break
+except:
+    page.close()
+    print "ABC CRITICAL: Exception loading page"
+    sys.exit(2)
+
+page.close()
+
+if lastState is None:
+    print "ABC OK: Serving home page"
+    sys.exit(0)
+else:
+    print "ABC CRITICAL: %s" % lastState
+    sys.exit(2)

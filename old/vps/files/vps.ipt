@@ -1,0 +1,6 @@
+$IPTABLES -A INPUT -m state --state NEW -p udp -m udp --dport 53 -j ACCEPT
+$IPTABLES -A INPUT -m state --state NEW -p tcp -m tcp --dport 53 -j ACCEPT
+
+$IPTABLES -A INPUT -m state --state NEW -p tcp -m tcp --dport 995 -j ACCEPT
+
+$IPTABLES -A INPUT -m state --state NEW -p tcp -m tcp --dport 1195 -j ACCEPT

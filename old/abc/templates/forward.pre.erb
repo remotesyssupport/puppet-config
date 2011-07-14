@@ -1,0 +1,32 @@
+$IPTABLES -A INPUT   -s 172.24.8.0/24 -j ACCEPT 
+$IPTABLES -A INPUT   -s 172.16.0.0/24 -j ACCEPT 
+$IPTABLES -A INPUT   -s 10.9.19.0/24 -j ACCEPT 
+$IPTABLES -A FORWARD -s 172.24.8.0/24 -d 10.100.2.0/24 -j ACCEPT 
+$IPTABLES -A FORWARD -s 172.16.0.0/24 -d 10.100.2.0/24 -j ACCEPT 
+$IPTABLES -A FORWARD -s 10.9.19.0/24 -d 10.100.2.0/24 -j ACCEPT 
+$IPTABLES -A FORWARD -s 10.100.2.0/24 -j ACCEPT 
+
+# Any connections previously allowed are OK
+$IPTABLES -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+# Let every internal machine access the public web server
+$IPTABLES -A FORWARD -i $PRIVINTF -o $PUBINTF -j ACCEPT
+
+# Let the public web server access the Puppetmaster
+for port in 8140 ftp 50000:60000 514; do
+    $IPTABLES -A FORWARD -o $PRIVINTF -p tcp -m tcp \
+	--dport $port -d <%= pm_1_ip %> -j ACCEPT
+done
+
+# Let the public web server access port 8080 of the internal Tomcat
+$IPTABLES -t nat -A POSTROUTING -o $PRIVINTF -j MASQUERADE
+$IPTABLES -A FORWARD -i $PUBINTF -o $PRIVINTF -p tcp -m tcp \
+    --dport 8080 -s <%= pub_1_ip %> -d <%= ws_1_ip %> -j ACCEPT
+$IPTABLES -A INPUT -i $PUBINTF -p tcp -m tcp \
+    --dport 8080 -s <%= pub_1_ip %> -d <%= ws_1_ip %> -j ACCEPT
+
+# Let the public web server access the DNS server
+for port in 53 514; do
+    $IPTABLES -A FORWARD -o $PRIVINTF -p udp -m udp \
+	--dport $port -d <%= pm_1_ip %> -j ACCEPT
+done

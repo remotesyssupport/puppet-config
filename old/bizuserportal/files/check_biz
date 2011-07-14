@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import getopt
+import re
+import urllib2
+
+def usage():
+    print """Usage: check_biz [-h|--help] \
+[-s NAME]"""
+    sys.exit(3)
+
+try:
+    options, args = getopt.getopt(sys.argv[1:],
+        "hs:",
+        "--help",
+        )
+except getopt.GetoptError:
+    usage()
+    sys.exit(3)
+
+serverName = None
+
+for name, value in options:
+    if name in ("-h", "--help"):
+        usage()
+    if name in ("-s"):
+        serverName = value
+
+if serverName is None:
+    print "BIZ UNKNOWN: Could not determine server name"
+    sys.exit(3)
+
+page = urllib2.urlopen('http://%s' % serverName)
+
+lastState = 'Cannot load'
+
+try:
+    for line in page.readlines():
+        if re.search('BIZCard is a registered trademark of BIZCard', line):
+            lastState = None
+            break
+except:
+    page.close()
+    print "BIZ CRITICAL: Exception loading page"
+    sys.exit(2)
+
+page.close()
+
+if lastState is None:
+    print "BIZ OK: Serving home page"
+    sys.exit(0)
+else:
+    print "BIZ CRITICAL: %s" % lastState
+    sys.exit(2)

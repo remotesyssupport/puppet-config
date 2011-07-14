@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- ===================================================================== -->
+<!--                                                                       -->
+<!--  JBoss Server DataBase Configuration                                  -->
+<!--                                                                       -->
+<!-- ===================================================================== -->
+
+<datasources>
+  <local-tx-datasource>
+    <jndi-name><%= jndi_name %></jndi-name>
+
+    <connection-url><%= connection_url %></connection-url>
+    <driver-class><%= driver_class %></driver-class>
+
+    <user-name><%= user_name %></user-name>
+    <password><%= password %></password>    
+
+    <min-pool-size>5</min-pool-size>
+    <max-pool-size>100</max-pool-size>    
+
+    <!--<check-valid-connection-sql>SELECT COUNT(*) FROM ADAGIO.SERVER</check-valid-connection-sql>-->
+
+    <metadata>
+       <type-mapping><%= type_mapping %></type-mapping>
+    </metadata>
+  </local-tx-datasource>
+</datasources>

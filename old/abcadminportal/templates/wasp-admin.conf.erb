@@ -1,0 +1,41 @@
+# Velocity configuration
+# The velocity settings are the same for both the "development" and "production" config 
+# files since velocity does not support running multiple instances of the velocity engine
+# with different configs
+
+# Oct 17, 2002
+# 	replaced all occurences of e:/apps/abcsys with e:/servers/softlex/deployedapp
+#
+# Oct 31, 2002
+# 	added directives to reduce logging
+#	also switched on cachescripts (finally!!)
+# Nov 21, 2003
+# 	replaced all occurences of e:/servers/softlex/deployedapp with $htdocs_cgibin_root_path
+# May 03, 2004 APR
+#	introduced $abc_adminportal_root to supercede $htdocs_cgibin_root_path
+
+file.resource.loader.path=/usr/tomcat/webapps
+file.resource.loader.cache = true 
+file.resource.loader.modificationCheckInterval = 1800
+resource.manager.logwhenfound = false
+
+directive.foreach.counter.name = loopCount
+
+# WASP configuration
+
+wasp.switch.scriptmode=on
+wasp.path.scripts=/usr/tomcat/webapps/admin/cgi-bin
+wasp.switch.cachescripts=on
+wasp.switch.printstacktraceonerror=on
+wasp.interval.maxsessionidle=6000
+
+# Minimize logging
+
+runtime.log.error.stacktrace = false
+runtime.log.warn.stacktrace = false
+runtime.log.info.stacktrace = false
+runtime.log.invalid.references = false 
+
+# Application specific config params (Admin app in this case)
+
+adminapp.ior.filename=/usr/tomcat/webapps/admin/WEB-INF/classes/jndi.properties

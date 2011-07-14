@@ -1,0 +1,118 @@
+ServerName <%= server_name %>
+ServerAlias <%= server_alias %>
+
+ServerAdmin <%= server_admin %>
+
+# Possible values include: debug, info, notice, warn, error, crit,
+# alert, emerg.
+LogLevel <%= log_level %>
+
+#ErrorLog syslog
+ErrorLog /var/log/httpd/<%= title %>-error_log
+CustomLog /var/log/httpd/<%= title %>-access_log combined
+
+ServerSignature On
+RewriteEngine On
+
+# -------------------------------------------------------------
+# directives for ABC website
+
+# grant access to content in /htdocs
+<LocationMatch "^/user/.*">
+    Order Deny,Allow
+    Allow from All
+</LocationMatch>
+
+# # grant access to catalog images
+# <LocationMatch "^/user/images/catalog/.*/.*\.(gif|jpg)">
+#     Order Deny,Allow
+#     Allow from All
+# </LocationMatch>
+
+# grant access to /robots.txt
+<LocationMatch "^/robots.txt">
+    Order Deny,Allow
+    Allow from All
+</LocationMatch>
+
+# grant access to /favicon.ico
+<LocationMatch "^/favicon.ico">
+    Order Deny,Allow
+    Allow from All
+</LocationMatch>
+
+<FilesMatch "\.(ico|pdf|flv|jpg|jpeg|png|gif|js|css|swf)$">
+    Header set Cache-Control "max-age=290304000, public"
+</FilesMatch>
+
+#----- Rewrite/Alias configuration
+
+RewriteMap unescape int:unescape
+
+# Notify that the site is down for maintenance
+#RewriteCond %{REMOTE_ADDR} !^74\.105\.230\.191$
+#RewriteRule !(/user/503-notice.html|/images/logo_clean.gif)$ /user/503-notice.html [L,R=503]
+#ErrorDocument 503 /user/503-notice.html
+
+# A request for / goes to /user/cgi/index.hd
+RewriteRule ^/$                             /user/cgi/index.hd
+
+# Preview image filter.
+RewriteCond ${unescape:%{QUERY_STRING}} ^(.*)$
+RewriteRule ^/user/cgi/preview\.(gif|jpg)$  /user/cgi/preview_open_document.hd?%1
+
+# Fixes for old URLs that search engines know about.
+# jww (2009-05-14): What is this site?  It doesn't even seem to be up
+#RewriteRule ^/postcards(.*)                 http://66.210.250.40:9673/postcards$1 [L,P]
+RewriteRule ^/products(.*)                  /user/cgi/products.hd [R]
+
+# Dynamic content
+RewriteRule ^/user/cgi/(.*)                 /tcc/$1 [L,PT]
+RewriteRule ^/user/Order_Form\.pdf          /user/Order_Form.pdf [L]
+RewriteCond %{REQUEST_URI} !Order_Form\.pdf$
+RewriteRule ^/(.*\.(hd|xml|pdf))            /tcc/$1 [L,PT]
+
+# Static content
+AliasMatch ^/(robots\.txt|favicon.ico)      /srv/ABC_Static/$1
+#AliasMatch ^/(.*)                           /srv/ABC_Static/$1
+#AliasMatch ^/s/(.*)                         /srv/ABC_Static/$1
+AliasMatch ^/user(.*)                       /srv/ABC_Static/$1
+
+# Proxy for help.americanbusinesscard.com
+RewriteRule ^/help/(.*)                     http://help.americanbusinesscard.com/$1 [L,P]
+
+<% if proxy_hosts.length == 1 then %>
+   ProxyPass /tcc http://<%= proxy_hosts[0] %>/user/cgi
+<% else %>
+   ProxyPass /tcc balancer://tcc_balancer stickysession=JSESSIONID nofailover=On 
+
+   <Proxy balancer://tcc_balancer>
+      <% proxy_hosts.each do |host| %>
+         BalancerMember http://<%= host %>/user/cgi loadfactor=1 route=<%= host.sub(":", "_") %>
+      <% end %>
+   </Proxy>
+<% end %>
+
+################################################################################
+
+# # directives used by the FDE
+# # these directives map standardized URL request made by the FDE to specific 
+# # dynamic content for a particlular system, in this case BIZ
+# RewriteRule ^/s/fde/hd/(.*)                                             /tcc/fde/$1 [L,PT]
+# RewriteRule ^/s/fde/font/Font(.*)\.swf                                  /tcc/fde/getfont.hd?int:slot_no=$1 [L,PT]
+# RewriteRule ^/s/fde/font/Fonts.xml                                      /tcc/fde/getfonts.hd [L,PT]
+# RewriteRule ^/s/fde/externalgraphic/unsecured/editorimage/(.+)\.jpg     /tcc/fde/external_unsecured_editor.hd?id=$1 [L,PT]
+# RewriteRule ^/s/fde/externalgraphic/secured/editorimage/(.+)\.jpg       /tcc/fde/external_secured_editor.hd?id=$1 [L,PT]
+# RewriteRule ^/s/fde/externalgraphic/secured/previewimage/(.+)\.jpg      /tcc/fde/external_secured_preview.hd?id=$1 [L,PT]
+# RewriteRule ^/s/fde/externalgraphic/secured/ExternalGraphic_(.+)\.xml   /tcc/fde/external_secured_xml.hd?id=$1 [L,PT]
+# 
+# # supress caching of FDE related content
+# <Location "/s/fde/font/ext/*.xml">
+#     Header set Expires       "Mon, 07 Dec 1999 21:29:02 GMT"
+#     Header set Cache-Control "no-store"
+#     Header set Pragma        "no-cache"
+# </Location>
+# 
+# # this directive serve the catalog image out of the catalog image repository that
+# # is separate from the user interface images used on the BIZ website
+# AliasMatch ^/images/catalog/(.*)    h:/catalogimages/final/$1

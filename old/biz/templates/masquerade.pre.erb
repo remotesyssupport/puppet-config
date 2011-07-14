@@ -1,0 +1,15 @@
+$IPTABLES -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+$IPTABLES -t nat -A POSTROUTING -o $PUBINTF -j MASQUERADE
+$IPTABLES -A FORWARD -s <%= srv_2_ip %> -j ACCEPT
+
+# Allow 10.100.2.102 to access 10.100.2.2 as if it were 10.9.19.175
+$IPTABLES -A FORWARD -s 10.100.2.102 -j ACCEPT
+$IPTABLES -t nat -A PREROUTING -d 10.9.19.175 -j DNAT --to-destination 10.100.2.2
+$IPTABLES -t nat -A POSTROUTING -s 10.100.2.2 -d 10.100.2.102 -j SNAT --to-source 10.9.19.175
+
+# Allow abcsys2-fax-1 to access JBoss on this server as a special case
+fax=172.24.8.220
+for port in 1098 1099 1101 8009 8083 8787 9090 4446 4447; do
+    $IPTABLES -A INPUT -m state --state NEW -s $fax \
+	-p tcp -m tcp --dport $port -j ACCEPT
+done

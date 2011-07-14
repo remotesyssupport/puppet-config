@@ -1,0 +1,4 @@
+# directives to serve ABC_ADMINPortal
+#AliasMatch  ^/admin(.*)          /usr/tomcat/webapps/admin/$1
+RewriteRule ^/admin$             http://<%= ws_1 %>:8080/admin/ [P,L]
+RewriteRule ^/admin(.*)          http://<%= ws_1 %>:8080/admin$1 [P,L]

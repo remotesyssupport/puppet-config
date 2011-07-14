@@ -1,0 +1,17 @@
+#!/bin/sh
+
+db=$1
+dir="$2/$1-$(date +%Y%m%d)"
+
+export PATH=/usr/kerberos/bin:/usr/java/default/bin:/usr/local/bin:/bin:/usr/bin:/usr/db2/db2inst1/sqllib/bin:/usr/db2/db2inst1/sqllib/adm:/usr/db2/db2inst1/sqllib/misc:/usr/db2/db2inst1/sqllib/db2tss/bin:/usr/db2/db2inst1/bin
+
+mkdir "$dir"
+
+(cd "$dir"; \
+ db2 connect to $db && \
+ db2look -d $db -e -a -o db2look.ddl && \
+ db2move $db export)
+
+(cd "$dir"/..; \
+ 7za a $(basename "$dir").7z $(basename "$dir") && \
+ rm -fr "$dir")

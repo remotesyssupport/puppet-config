@@ -1,32 +1,16 @@
 #!/usr/bin/env python
 
-# jww (2011-07-04): Have a local bootstrap script to run the process from here
 # jww (2011-07-04): Have remote git clone a puppet repo to start the server
 
-##############################################################################
+# Ruby details
 
-# This script is run in one of two ways:
-#
-#   puppet slave:  python bootstrap.py <IP ADDR OF 'puppet' MASTER>
-#   puppet master: python bootstrap.py --server
-#
-# After running with --server, do the following final steps manually:
-#
-#  1. 'kill' puppetd and puppetmasterd (don't use 'service')
-#  2. rm -fr /var/lib/puppet/ssl
-#  3. service puppetmaster start
-#  4. puppetd --test (this will fail due to lack of certificate)
-#  5. puppetca --sign --all
-#  6. puppetd --test
-#  7. service puppet start (if the last step succeeded)
-#
-# After running to bootstrap a slave:
-#
-#  1. 'kill' puppetd (don't use 'service')
-#  2. puppetd --test (this will fail due to lack of certificate)
-#  3. (on the puppet master) puppetca --sign --all
-#  4. puppetd --test
-#  5. service puppet start (if the last step succeeded)
+ruby_version     = "1.8.7"
+ruby_rev         = "7"
+ruby_date        = "2011.03"
+rubygems_version = "1.5.2"
+ruby_tarball     = 'ruby-enterprise-%s-%s.tar.gz' % (ruby_version, ruby_date)
+
+##############################################################################
 #
 # This script is designed to be _idempotent_, meaning it can be run multiple
 # times and only new changes will be added to the system.
@@ -65,8 +49,8 @@ class CommandLineApp(object):
     options = {
         'verbose':  False,
         'logfile':  False,
-        'loglevel': False
-        'master':   False,
+        'loglevel': False,
+        'remote':   False
     }
 
     def __init__(self):
@@ -80,7 +64,7 @@ class CommandLineApp(object):
         self.log_handler = ch
 
         # Setup the options parser
-        usage = 'usage: %prog [options] <BOUND-IP-ADDRESS>'
+        usage = 'usage: %prog [options]'
         op = self.option_parser = optparse.OptionParser(usage = usage)
 
         op.add_option('-v', '--verbose',
@@ -89,15 +73,15 @@ class CommandLineApp(object):
         op.add_option('-q', '--quiet',
                       action='store_true', dest='quiet',
                       default=False, help='do not show log messages on console')
-        op.add_option('-s', '--master',
-                      action='store_true', dest='master',
-                      default=False, help='bootstrap a puppet master')
         op.add_option('', '--log', metavar='FILE',
                       type='string', action='store', dest='logfile',
                       default=False, help='append logging data to FILE')
         op.add_option('', '--loglevel', metavar='LEVEL',
                       type='string', action='store', dest='loglevel',
                       default=False, help='set log level: DEBUG, INFO, WARNING, ERROR, CRITICAL')
+        op.add_option('', '--remote',
+                      action='store_true', dest='remote',
+                      default=False, help='indicates script is running on the remote side')
 
     def main(self, *args):
         """Main body of your application.
@@ -184,19 +168,21 @@ class CommandLineApp(object):
             sys.exit(exit_code)
         return exit_code
 
-def mkreader(self, *args, **kwargs):
-    self.log.info(str(args))
+app = None
+
+def mkreader(*args, **kwargs):
+    app.log.info(str(args))
     kwargs['stdout'] = subprocess.PIPE
     p = subprocess.Popen(args, **kwargs)
     return p.stdout
 
-def mkwriter(self, *args, **kwargs):
-    self.log.info(str(args))
+def mkwriter(*args, **kwargs):
+    app.log.info(str(args))
     kwargs['stdin'] = subprocess.PIPE
     p = subprocess.Popen(args, **kwargs)
     return p.stdin
 
-def shuttle(self, reader, writer):
+def shuttle(reader, writer):
     data = reader.read(8192)
     while data:
         writer.write(data)
@@ -237,7 +223,7 @@ def shell(*args, **kwargs):
 
     if 'cwd' in kwargs:
         cwd = os.getcwd()
-        print '%s (in %s)' % (args, cwd)
+        app.log.info('%s (in %s)' % (args, cwd))
         try:
             os.chdir(kwargs['cwd'])
             if subprocess.call(args, **kwargs) == 0:
@@ -247,7 +233,7 @@ def shell(*args, **kwargs):
         finally:
             os.chdir(cwd)
     else:
-        print args
+        app.log.info(str(args))
         if subprocess.call(args, **kwargs) == 0:
             return True
         else:
@@ -265,26 +251,30 @@ def shell(*args, **kwargs):
 class Machine(object):
     is_64bit = False
     packages = []
+    gems     = []
 
     def __init__(self):
         self.packages = []
+        self.gems     = []
 
     def install(self, *pkgs):
         raise Exception("Not implemented")
 
-    def uninstall(self, *pkgs):
+    def installed_packages(self):
         raise Exception("Not implemented")
 
-    def remove(*pkgs):
+    def remove(self, *pkgs):
         to_remove = []
+
         for pkg in pkgs:
-            if has_package(pkg):
+            if self.has_package(pkg):
                 to_remove.append(pkg)
                 break
-        if len(to_remove) > 0:
-            self.uninstall(*to_remove)
 
-    def installed_packages(self):
+        if len(to_remove) > 0:
+            self.uninstall_package(*to_remove)
+
+    def uninstall_package(self, *pkgs):
         raise Exception("Not implemented")
 
     def cleanup_packages(self):
@@ -296,10 +286,42 @@ class Machine(object):
                 return package
         return None
 
+    def gem_install(self, *pkgs):
+        for pkg in pkgs:
+            if pkg not in self.gems:
+                shell('gem', 'install', '-r', pkg)
+
+    def installed_gems(self):
+        if not self.gems:
+            for line in mkreader('gem', 'list'):
+                match = re.match('^(.+?) \(.+\)', line)
+                if match:
+                    self.gems.append(match.group(1))
+        return self.gems
+
+    def gem_remove(self, *pkgs):
+        raise Exception("Not implemented")
+
 class Machine_CentOS(Machine):
     def __init__(self):
         Machine.__init__(self)
+
+        self.dist     = "el5"
         self.is_64bit = platform.architecture()[0] == '64bit'
+
+        if self.is_64bit:
+            self.arch = 'x86_64'
+        else:
+            self.arch = 'i386'
+
+        self.ruby_rpm     = \
+            join('/tmp/puppet/centos',
+                 'ruby-enterprise-%s-%s.%s.%s.rpm' %
+                 (ruby_version, ruby_rev, self.dist, self.arch))
+        self.rubygems_rpm = \
+            join('/tmp/puppet/centos',
+                 'ruby-enterprise-rubygems-%s-%s.%s.%s.rpm' %
+                 (rubygems_version, ruby_rev, self.dist, self.arch))
 
     def install(self, *pkgs):
         if self.is_64bit:
@@ -307,7 +329,7 @@ class Machine_CentOS(Machine):
         else:
             shell('yum', 'install', '-y', *pkgs)
 
-    def uninstall(self, *pkgs):
+    def uninstall_package(self, *pkgs):
         shell('yum', 'remove', '-q', '-y', *pkgs)
 
     def installed_packages(self):
@@ -323,8 +345,59 @@ class Machine_CentOS(Machine):
     def cleanup_packages(self):
         # Clean up non-64bit packages
         if self.is_64bit:
-            remove(*filter(lambda x: not re.search('(x86_64|noarch)', x),
-                           self.installed_packages()))
+            pkgs = filter(lambda x: not re.search('(x86_64|noarch)', x),
+                          self.installed_packages())
+            if pkgs:
+                self.uninstall_package(*pkgs)
+
+    def install_tools(self):
+        # These are the packages needed to build RPMs in general, and the Ruby
+        # Enterprise RPMs in particular
+        self.install('autoconf',
+                     'automake',
+                     'libtool',
+                     'make',
+                     'gcc',
+                     'gcc-c++',
+                     'glibc-devel',
+                     'kernel-devel',
+                     'rpm-build',
+                     'rpm-devel',
+                     'openssl-devel',
+                     'readline-devel',
+                     'zlib-devel')
+
+    def install_ruby(self):
+        srcdir  = '/usr/src/redhat'
+        specs   = join(srcdir, 'SPECS')
+        sources = join(srcdir, 'SOURCES')
+        rpms    = join(srcdir, 'RPMS', self.arch)
+
+        if not isfile(self.ruby_rpm):
+            rpm = join(rpms, self.ruby_rpm)
+            if not isfile(rpm):
+                if not isdir(specs):   os.makedirs(specs)
+                if not isdir(sources): os.makedirs(sources)
+
+                shutil.copy(ruby_tarball, sources)
+                shutil.copy('ruby-enterprise.spec', specs)
+                shell('rpmbuild', '-bb',
+                      '--define', 'dist .' + self.dist,
+                      'ruby-enterprise.spec', cwd=specs)
+
+            if isfile(rpm):
+                shutil.copy(rpm, ".")
+                shutil.copy(join(rpms, self.rubygems_rpm), ".")
+
+        if not isfile(self.ruby_rpm):
+            raise Exception("Failed to build the Ruby RPM " + self.ruby_rpm)
+
+        if not self.has_package('ruby-enterprise'):
+            shell('rpm', '-Uvh', self.ruby_rpm, self.rubygems_rpm)
+
+class Machine_OpenIndiana(Machine):
+    def __init__(self):
+        Machine.__init__(self)
 
 ##############################################################################
 
@@ -334,97 +407,111 @@ class PuppetCommon(object):
     def __init__(self, machine):
         self.machine = machine
 
+    def cleanup_packages(self):
+        self.machine.cleanup_packages()
+
+    def install_tools(self):
+        self.machine.install_tools()
+
+    def install_ruby(self):
+        self.machine.install_ruby()
+
+    def install_puppet(self):
+        self.machine.gem_install('puppet')
+
+    def bootstrap(self):
+        raise Exception("Not implemented")
+
 class PuppetAgent(PuppetCommon):
-    pass
+    def __init__(self, machine, puppet_host=None):
+        PuppetCommon.__init__(self, machine)
+        self.puppet_host = puppet_host
+
+    def install_puppet(self):
+        PuppetCommon.install_puppet(self)
+
+        if not grep('/etc/hosts', '\<puppet\>'):
+            if self.puppet_host:
+                append_file('/etc/hosts', '%s   puppet' % self.puppet_host)
+            else:
+                append_file('/etc/hosts', '127.0.0.1   puppet')
+
+    def bootstrap(self):
+        shell('puppet', 'apply', '--verbose', 'bootstrap-agent.pp')
 
 class PuppetMaster(PuppetCommon):
-    pass
+    def __init__(self, machine):
+        PuppetCommon.__init__(self, machine)
+
+    def install_puppet(self):
+        PuppetCommon.install_puppet(self)
+
+    def bootstrap(self):
+        shell('puppet', 'apply', '--verbose', 'bootstrap-master.pp')
 
 #############################################################################
 
-# Build and install Ruby
+class PuppetBootstrap(CommandLineApp):
+    def main(self, *args):
+        if self.options.remote:
+            if sys.platform == 'linux2':
+                machine = Machine_CentOS()
+            elif sys.platform == 'sunos5':
+                machine = Machine_OpenIndiana()
+            else:
+                raise Exception("Unknown machine type")
 
-arch             = 'x86_64'
-ruby_version     = "1.8.7"
-ruby_rev         = "7"
-ruby_date        = "2011.03"
-rubygems_version = "1.5.2"
-dist             = "el5"
+            if len(args) == 1:
+                master = args[0]
+                host   = PuppetAgent(machine, master)
+            else:
+                master = None
+                host   = PuppetMaster(machine)
 
-ruby_tarball     = 'ruby-enterprise-%s-%s.tar.gz' % (ruby_version, ruby_date)
-ruby_rpm         = 'ruby-enterprise-%s-%s.%s.%s.rpm' % \
-                   (ruby_version, ruby_rev, dist, arch)
-rubygems_rpm     = 'ruby-enterprise-rubygems-%s-%s.%s.%s.rpm' % \
-                   (rubygems_version, ruby_rev, dist, arch)
+            host.cleanup_packages()
 
-if sys.platform == 'linux2':
-    srcdir  = '/usr/src/redhat'
-    specs   = join(srcdir, 'SPECS')
-    sources = join(srcdir, 'SOURCES')
-    rpms    = join(srcdir, 'RPMS', arch)
+            host.install_tools()
+            host.install_ruby()
+            host.install_puppet()
 
-    if not isfile(ruby_rpm):
-        rpm = join(rpms, ruby_rpm)
-        if not isfile(rpm):
-            if not isdir(specs):   os.makedirs(specs)
-            if not isdir(sources): os.makedirs(sources)
+            host.bootstrap()
 
-            # These are the packages needed to build RPMs in general, and the
-            # Ruby Enterprise RPMs in particular
-            install64('autoconf',
-                      'automake',
-                      'libtool',
-                      'make',
-                      'gcc',
-                      'gcc-c++',
-                      'glibc-devel',
-                      'kernel-devel',
-                      'rpm-build',
-                      'rpm-devel',
-                      'openssl-devel',
-                      'readline-devel',
-                      'zlib-devel')
+            shell('service', 'puppet', 'stop')
+            if not master:
+                shell('service', 'puppetmaster', 'stop')
+                shutil.rmtree('/var/lib/puppet/ssl')
+                shell('service', 'puppetmaster', 'start')
 
-            shutil.copy(ruby_tarball, sources)
-            shutil.copy('ruby-enterprise.spec', specs)
-            shell('rpmbuild', '-bb', '--define', 'dist .' + dist,
-                  'ruby-enterprise.spec', cwd=specs)
+            shell('puppetd', '--test')
+            if not master:
+                shell('puppetca', '--sign', '--all')
+                shell('puppetd', '--test')
+                shell('service', 'puppet', 'start')
 
-        if isfile(rpm):
-            shutil.copy(rpm, ".")
-            shutil.copy(join(rpms, rubygems_rpm), ".")
+                shell('rpm', '-Uvh',
+                      'http://repo.webtatic.com/yum/centos/5/latest.rpm')
+                shell('yum', 'install', '-y', '--enablerepo=webtatic', 'git')
 
-    if not isfile(ruby_rpm):
-        raise Exception("Failed to build the Ruby RPM " + ruby_rpm)
+        else:
+            host   = args[0]
+            ostype = args[1]
 
-    if not has_package('ruby-enterprise'):
-        shell('rpm', '-Uvh', ruby_rpm, rubygems_rpm)
+            shell('ssh', host, 'yum', 'install', '-y', 'rsync')
+            shell('rsync', '-av', '--include=/%s/' % ostype, '--exclude=/*/',
+                  './', '%s:/tmp/puppet/' % host)
+            shell('ssh', host, 'chmod', 'ugo+rX', '/tmp/puppet')
 
-# Install Puppet via Rubygems
+            if len(args) > 2:
+                master = args[2]
+            else:
+                master = ''     # this means we are bootstrapping a master
 
-gems = []
-for line in mkreader('gem', 'list'):
-    match = re.match('^(.+?) \(.+\)', line)
-    if match:
-        gems.append(match.group(1))
+            #shell('ssh', host, 'python',
+            #      '/tmp/puppet/bootstrap.py', '--remote', master)
 
-def gem_install(*pkgs):
-    for pkg in pkgs:
-        if pkg not in gems:
-            shell('gem', 'install', '-r', pkg)
-
-gem_install('puppet')
-
-if not grep('/etc/hosts', '\<puppet\>'):
-    if sys.argv[-1] != sys.argv[0] and \
-       not sys.argv[-1].startswith('--'):
-        append_file('/etc/hosts', '%s   puppet' % sys.argv[-1])
-    else:
-        append_file('/etc/hosts', '127.0.0.1   puppet')
-
-if master:
-    shell('puppet', 'apply', '--verbose', 'bootstrap-master.pp')
-else:
-    shell('puppet', 'apply', '--verbose', 'bootstrap-agent.pp')
+app = PuppetBootstrap()
+app.run()
 
 sys.exit(0)
+
+### bootstrap.py ends here

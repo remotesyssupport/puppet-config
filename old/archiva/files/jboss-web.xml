@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jboss-web>
+ <resource-ref>
+   <res-ref-name>jdbc/users</res-ref-name>
+   <jndi-name>java:ArchivaUsersDS</jndi-name>
+ </resource-ref>
+<resource-ref>
+   <res-ref-name>jdbc/archiva</res-ref-name>
+   <jndi-name>java:ArchivaDS</jndi-name>
+ </resource-ref>
+ <resource-ref>
+   <res-ref-name>mail/Session</res-ref-name>
+   <jndi-name>java:/Mail</jndi-name>
+ </resource-ref>
+</jboss-web>

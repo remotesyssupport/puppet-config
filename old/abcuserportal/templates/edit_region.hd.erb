@@ -1,0 +1,63 @@
+#execfile(app.config)
+
+import DB_Jython as DB
+import fsql
+import cgi
+
+if app.merchant_id == '0':
+    db = DB.connect('<%= mysql_abc_uri %>', '<%= mysql_abc_user %>', '<%= mysql_abc_password %>')
+elif app.merchant_id == '4':
+    db = DB.connect('<%= mysql_adc_uri %>', '<%= mysql_adc_user %>', '<%= mysql_adc_password %>')
+else:
+    raise Exception('edit_region.hd: unknown merchant ID: %s'
+                    % app.merchant_id)
+
+EditableRegionID = form.id
+
+pk = {'EditableRegionID': EditableRegionID}
+
+if form.has_key('action'):
+    action = form.action
+
+    row = {
+        'EditableRegionID': EditableRegionID,
+        'Content':          form.content,
+    }
+
+    if action == 'insert':
+        db.execute(fsql.insert('EditableRegion', row))
+        
+    elif action == 'update':
+        db.execute(fsql.update('EditableRegion', row, pk))
+
+if db.getone(fsql.select('EditableRegion', pk, 'COUNT(*)')) == 0:
+    action = 'insert'
+    Content = 'Enter content here.'
+else:
+    action = 'update'
+    Content = db.getone(fsql.select('EditableRegion', pk, 'Content'))
+
+db.close()
+
+Content = cgi.escape(Content.replace('\r', ''))
+
+print >> resp.out(), '''
+<html>
+<head>
+<title>Editable Region: %(EditableRegionID)s</title>
+<style>body {font-family: sans-serif; font-size: smaller}</style>
+</head>
+
+<body bgcolor="white">
+<table align="center" height="100%%"><tr><td align="right">
+<form action="edit_region.hd" method="post">
+<input type="hidden" name="action" value="%(action)s">
+<input type="hidden" name="id" value="%(EditableRegionID)s">
+<textarea name="content" rows="30" cols="80">%(Content)s</textarea><br>
+<input type="submit" value="Update">
+<input type="button" value="Close" onclick="window.close()">
+</form>
+</td></tr></table>
+</body>
+</html>
+''' % vars()

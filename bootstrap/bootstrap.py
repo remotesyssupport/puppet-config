@@ -2,6 +2,8 @@
 
 # jww (2011-07-04): Have remote git clone a puppet repo to start the server
 
+tmpdir = '/tmp/puppet'
+
 # Ruby details
 
 ruby_version     = "1.8.7"
@@ -308,11 +310,11 @@ class Machine_CentOS(Machine):
             self.arch = 'i386'
 
         self.ruby_rpm     = \
-            join('/tmp/puppet/centos',
+            join(tmpdir, 'centos',
                  'ruby-enterprise-%s-%s.%s.%s.rpm' %
                  (ruby_version, ruby_rev, self.dist, self.arch))
         self.rubygems_rpm = \
-            join('/tmp/puppet/centos',
+            join(tmpdir, 'centos',
                  'ruby-enterprise-rubygems-%s-%s.%s.%s.rpm' %
                  (rubygems_version, ruby_rev, self.dist, self.arch))
 
@@ -426,7 +428,8 @@ class PuppetCommon(object):
         self.machine.install_ruby()
 
     def install_puppet(self):
-        self.machine.gem_install('puppet')
+        if 'puppet' not in self.machine.installed_gems():
+            self.machine.gem_install('puppet')
 
     def bootstrap(self):
         raise Exception("Not implemented")
@@ -443,7 +446,8 @@ class PuppetAgent(PuppetCommon):
             append_file('/etc/hosts', '%s   puppet' % self.puppet_host)
 
     def bootstrap(self):
-        shell('puppet', 'apply', '--verbose', 'bootstrap-agent.pp')
+        shell('puppet', 'apply', '--verbose',
+              join(tmpdir, 'bootstrap-agent.pp'))
 
 class PuppetMaster(PuppetCommon):
     def __init__(self, machine):
@@ -456,7 +460,8 @@ class PuppetMaster(PuppetCommon):
             append_file('/etc/hosts', '127.0.0.1   puppet')
 
     def bootstrap(self):
-        shell('puppet', 'apply', '--verbose', 'bootstrap-master.pp')
+        shell('puppet', 'apply', '--verbose',
+              join(tmpdir, 'bootstrap-master.pp'))
 
 #############################################################################
 
@@ -487,10 +492,12 @@ class PuppetBootstrap(CommandLineApp):
             shell('service', 'puppet', 'stop')
             if not master:
                 shell('service', 'puppetmaster', 'stop')
-                shutil.rmtree('/var/lib/puppet/ssl')
+                shutil.rmtree('/etc/puppet/ssl')
                 shell('service', 'puppetmaster', 'start')
 
-            shell('puppetd', '--test')
+            try: shell('puppetd', '--test')
+            except: pass
+
             if not master:
                 shell('puppetca', '--sign', '--all')
                 shell('puppetd', '--test')
@@ -507,16 +514,16 @@ class PuppetBootstrap(CommandLineApp):
 
             shell('ssh', host, 'yum', 'install', '-y', 'rsync')
             shell('rsync', '-av', '--include=/%s/' % ostype, '--exclude=/*/',
-                  './', '%s:/tmp/puppet/' % host)
-            shell('ssh', host, 'chmod', 'ugo+rX', '/tmp/puppet')
+                  './', '%s:%s/' % (host, tmpdir))
+            shell('ssh', host, 'chmod', 'ugo+rX', tmpdir)
 
             if len(args) > 2:
                 master = args[2]
             else:
                 master = ''     # this means we are bootstrapping a master
 
-            #shell('ssh', host, 'python',
-            #      '/tmp/puppet/bootstrap.py', '--remote', master)
+            shell('ssh', host, 'python',
+                  join(tmpdir, 'bootstrap.py'), '--remote', master)
 
 app = PuppetBootstrap()
 app.run()

@@ -503,11 +503,12 @@ class PuppetBootstrap(CommandLineApp):
                 shell('puppetd', '--test')
                 shell('service', 'puppet', 'start')
 
-                shell('rpm', '-Uvh',
-                      'http://repo.webtatic.com/yum/centos/5/latest.rpm')
-                shell('yum', 'install', '-y', '--enablerepo=webtatic', 'git')
-                shell('git', 'clone', 'git://github.com/jwiegley/puppet-config',
-                      '/etc/puppet/modules')
+                if not isdir('/etc/puppet/modules'):
+                    shell('rpm', '-Uvh',
+                          'http://repo.webtatic.com/yum/centos/5/latest.rpm')
+                    shell('yum', 'install', '-y', '--enablerepo=webtatic', 'git')
+                    shell('git', 'clone', 'git://github.com/jwiegley/puppet-config',
+                          '/etc/puppet/modules')
         else:
             host   = args[0]
             ostype = args[1]

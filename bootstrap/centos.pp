@@ -44,22 +44,3 @@ class centos
   package { $remove: ensure => absent }
 }
 
-class rpm::build
-{
-  $packages = [ 'autoconf'
-              , 'automake'
-              , 'libtool'
-              , 'make'
-              , 'gcc'
-              , 'gcc-c++'
-              , 'glibc-devel'
-              , 'kernel-devel'
-              , 'rpm-build'
-              , 'rpm-devel'
-              , 'openssl-devel'
-              , 'readline-devel'
-              , 'zlib-devel'
-              ]
-
-  package { $packages: ensure => latest }
-}

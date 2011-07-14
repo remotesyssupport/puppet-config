@@ -350,23 +350,6 @@ class Machine_CentOS(Machine):
             if pkgs:
                 self.uninstall_package(*pkgs)
 
-    def install_tools(self):
-        # These are the packages needed to build RPMs in general, and the Ruby
-        # Enterprise RPMs in particular
-        self.install('autoconf',
-                     'automake',
-                     'libtool',
-                     'make',
-                     'gcc',
-                     'gcc-c++',
-                     'glibc-devel',
-                     'kernel-devel',
-                     'rpm-build',
-                     'rpm-devel',
-                     'openssl-devel',
-                     'readline-devel',
-                     'zlib-devel')
-
     def install_ruby(self):
         srcdir  = '/usr/src/redhat'
         specs   = join(srcdir, 'SPECS')
@@ -409,9 +392,6 @@ class PuppetCommon(object):
 
     def cleanup_packages(self):
         self.machine.cleanup_packages()
-
-    def install_tools(self):
-        self.machine.install_tools()
 
     def install_ruby(self):
         self.machine.install_ruby()
@@ -470,7 +450,6 @@ class PuppetBootstrap(CommandLineApp):
 
             host.cleanup_packages()
 
-            host.install_tools()
             host.install_ruby()
             host.install_puppet()
 
@@ -491,7 +470,8 @@ class PuppetBootstrap(CommandLineApp):
                 shell('rpm', '-Uvh',
                       'http://repo.webtatic.com/yum/centos/5/latest.rpm')
                 shell('yum', 'install', '-y', '--enablerepo=webtatic', 'git')
-
+                shell('git', 'clone', 'git://github.com/jwiegley/puppet-config',
+                      '/etc/puppet/modules')
         else:
             host   = args[0]
             ostype = args[1]

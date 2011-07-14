@@ -91,11 +91,14 @@ case $operatingsystem {
 
     $packages = [ "mysql-server", "mysql-devel.$architecture" ]
 
-    package { $packages: ensure => installed }
+    package { $packages:
+      ensure => installed;
+    }
 
     # Building the mysql gem requires mysql-devel
     Package["mysql"] {
-      require => [ Package["mysql-devel.$architecture"], Package["gcc"] ]
+      require => [ Package["mysql-devel.$architecture"],
+                   Package[$devel_pkgs] ]
     }
 
     Service[puppetmaster] {

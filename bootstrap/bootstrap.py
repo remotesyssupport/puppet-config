@@ -218,8 +218,8 @@ def append_file(path, line_to_add):
     os.remove(temp_path)
 
 def shell(*args, **kwargs):
-    if 'stdout' not in kwargs: kwargs['stdout'] = sys.stdout
-    if 'stderr' not in kwargs: kwargs['stderr'] = sys.stderr
+    #if 'stdout' not in kwargs: kwargs['stdout'] = sys.stdout
+    #if 'stderr' not in kwargs: kwargs['stderr'] = sys.stderr
 
     if 'cwd' in kwargs:
         cwd = os.getcwd()
@@ -234,13 +234,6 @@ def shell(*args, **kwargs):
             os.chdir(cwd)
     else:
         app.log.info(str(args))
-        if subprocess.call(args, **kwargs) == 0:
-            return True
-        else:
-            raise Exception("Command failed: " + str(args))
-    def shell(self, *args, **kwargs):
-
-        self.log.info(str(args))
         if subprocess.call(args, **kwargs) == 0:
             return True
         else:
@@ -350,6 +343,42 @@ class Machine_CentOS(Machine):
             if pkgs:
                 self.uninstall_package(*pkgs)
 
+        self.cleanup_unneeded_packages()
+
+    def cleanup_unneeded_packages(self):
+        self.uninstall_package( 'atk'
+                              , 'authconfig'
+                              , 'bitstream-vera-fonts'
+                              , 'cairo'
+                              , 'cups-libs'
+                              , 'dhcpv6-client'
+                              , 'ecryptfs-utils'
+                              , 'fontconfig'
+                              , 'freetype'
+                              , 'gtk2'
+                              , 'hdparm'
+                              , 'hicolor-icon-theme'
+                              , 'libX11'
+                              , 'libXau'
+                              , 'libXcursor'
+                              , 'libXdmcp'
+                              , 'libXext'
+                              , 'libXfixes'
+                              , 'libXft'
+                              , 'libXi'
+                              , 'libXinerama'
+                              , 'libXrandr'
+                              , 'libXrender'
+                              , 'libhugetlbfs'
+                              , 'libjpeg'
+                              , 'libpng'
+                              , 'libtiff'
+                              , 'pango'
+                              , 'setserial'
+                              , 'trousers'
+                              , 'udftools'
+                              , 'xorg-x11-filesystem')
+        
     def install_ruby(self):
         srcdir  = '/usr/src/redhat'
         specs   = join(srcdir, 'SPECS')
@@ -411,10 +440,7 @@ class PuppetAgent(PuppetCommon):
         PuppetCommon.install_puppet(self)
 
         if not grep('/etc/hosts', '\<puppet\>'):
-            if self.puppet_host:
-                append_file('/etc/hosts', '%s   puppet' % self.puppet_host)
-            else:
-                append_file('/etc/hosts', '127.0.0.1   puppet')
+            append_file('/etc/hosts', '%s   puppet' % self.puppet_host)
 
     def bootstrap(self):
         shell('puppet', 'apply', '--verbose', 'bootstrap-agent.pp')
@@ -425,6 +451,9 @@ class PuppetMaster(PuppetCommon):
 
     def install_puppet(self):
         PuppetCommon.install_puppet(self)
+
+        if not grep('/etc/hosts', '\<puppet\>'):
+            append_file('/etc/hosts', '127.0.0.1   puppet')
 
     def bootstrap(self):
         shell('puppet', 'apply', '--verbose', 'bootstrap-master.pp')

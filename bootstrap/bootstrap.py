@@ -6,11 +6,14 @@ tmpdir = '/tmp/puppet'
 
 # Ruby details
 
-ruby_version     = "1.8.7"
-ruby_rev         = "7"
-ruby_date        = "2011.03"
-rubygems_version = "1.5.2"
-ruby_tarball     = 'ruby-enterprise-%s-%s.tar.gz' % (ruby_version, ruby_date)
+ruby_version      = "1.8.7"
+ruby_rev          = "7"
+ruby_date         = "2011.03"
+rubygems_version  = "1.5.2"
+ruby_tarball      = 'ruby-enterprise-%s-%s.tar.gz' % (ruby_version, ruby_date)
+
+perftools_version = "1.7"
+git_version       = "1.7.6"
 
 ##############################################################################
 #
@@ -176,13 +179,13 @@ def mkreader(*args, **kwargs):
     app.log.info(str(args))
     kwargs['stdout'] = subprocess.PIPE
     p = subprocess.Popen(args, **kwargs)
-    return p.stdout
+    return (p, p.stdout)
 
 def mkwriter(*args, **kwargs):
     app.log.info(str(args))
     kwargs['stdin'] = subprocess.PIPE
     p = subprocess.Popen(args, **kwargs)
-    return p.stdin
+    return (p, p.stdin)
 
 def shuttle(reader, writer):
     data = reader.read(8192)
@@ -225,20 +228,30 @@ def shell(*args, **kwargs):
 
     if 'cwd' in kwargs:
         cwd = os.getcwd()
-        app.log.info('%s (in %s)' % (args, cwd))
         try:
             os.chdir(kwargs['cwd'])
-            if subprocess.call(args, **kwargs) == 0:
+            app.log.info('%s (in %s)' % (args, cwd))
+            p = subprocess.Popen(args, **kwargs)
+            if p.wait() == 0:
+                sys.stdout.flush()
+                sys.stderr.flush()
                 return True
             else:
+                sys.stdout.flush()
+                sys.stderr.flush()
                 raise Exception("Command failed: %s (in %s)" % (args, cwd))
         finally:
             os.chdir(cwd)
     else:
         app.log.info(str(args))
-        if subprocess.call(args, **kwargs) == 0:
+        p = subprocess.Popen(args, **kwargs)
+        if p.wait() == 0:
+            sys.stdout.flush()
+            sys.stderr.flush()
             return True
         else:
+            sys.stdout.flush()
+            sys.stderr.flush()
             raise Exception("Command failed: " + str(args))
 
 ##############################################################################
@@ -288,13 +301,29 @@ class Machine(object):
 
     def installed_gems(self):
         if not self.gems:
-            for line in mkreader('gem', 'list'):
+            p, fd = mkreader('gem', 'list')
+            for line in fd:
                 match = re.match('^(.+?) \(.+\)', line)
                 if match:
                     self.gems.append(match.group(1))
+            fd.close()
+            if p.wait() != 0:
+                raise Exception("installed_gems failed")
         return self.gems
 
     def gem_remove(self, *pkgs):
+        raise Exception("Not implemented")
+
+    def install_ruby(self):
+        raise Exception("Not implemented")
+
+    def install_git(self):
+        raise Exception("Not implemented")
+
+    def start_service(self, name):
+        raise Exception("Not implemented")
+
+    def stop_service(self, name):
         raise Exception("Not implemented")
 
 class Machine_CentOS(Machine):
@@ -329,12 +358,16 @@ class Machine_CentOS(Machine):
 
     def installed_packages(self):
         if not self.packages:
-            for line in mkreader('yum', 'list', 'installed'):
+            p, fd = mkreader('yum', 'list', 'installed')
+            for line in fd:
                 match = re.match('^(.+?)\s+', line)
                 if match:
                     package = match.group(1)
                     if re.search('\.', package):
                         self.packages.append(package)
+            fd.close()
+            if p.wait() != 0:
+                raise Exception("installed_packages failed")
         return self.packages
 
     def cleanup_packages(self):
@@ -409,9 +442,100 @@ class Machine_CentOS(Machine):
         if not self.has_package('ruby-enterprise'):
             shell('rpm', '-Uvh', self.ruby_rpm, self.rubygems_rpm)
 
+    def install_git(self):
+        shell('rpm', '-Uvh', 'http://repo.webtatic.com/yum/centos/5/latest.rpm')
+        shell('yum', 'install', '-y', '--enablerepo=webtatic', 'git')
+
+    def start_service(self, name):
+        shell('service', name, 'start')
+
+    def stop_service(self, name):
+        shell('service', name, 'stop')
+
 class Machine_OpenIndiana(Machine):
     def __init__(self):
         Machine.__init__(self)
+
+        self.perftools_pkg = \
+            join(tmpdir, 'solaris',
+                 'google-perftools-%s.pkg' % perftools_version)
+        self.ruby_pkg = \
+            join(tmpdir, 'solaris',
+                 'ruby-enterprise-%s-%s.pkg' % (ruby_version, ruby_date))
+
+    def install(self, *pkgs):
+        shell('pkg', 'install', *pkgs)
+
+    def uninstall_package(self, *pkgs):
+        shell('pkg', 'uninstall', *pkgs)
+
+    def installed_packages(self):
+        if not self.packages:
+            p, fd = mkreader('pkg', 'list', '-H')
+            for line in fd:
+                match = re.match('(.+?)\s+', line)
+                if match:
+                    package = match.group(1)
+                    if re.search('\.', package):
+                        self.packages.append(package)
+            fd.close()
+            if p.wait() != 0:
+                raise Exception("installed_packages failed")
+
+            p, fd = mkreader('pkginfo')
+            for line in fd:
+                match = re.match('\S+\s+(.+?)\s+', line)
+                if match:
+                    package = match.group(1)
+                    self.packages.append(package)
+            fd.close()
+            if p.wait() != 0:
+                raise Exception("installed_packages failed")
+        return self.packages
+
+    def cleanup_packages(self):
+        pass
+    
+    def install_pkg(self, path):
+        fd = open(join(tmpdir, 'noask'), 'w')
+        fd.write("""mail=
+instance=overwrite
+partial=nocheck
+runlevel=nocheck
+idepend=nocheck
+rdepend=nocheck
+space=nocheck
+setuid=nocheck
+conflict=nocheck
+action=nocheck
+basedir=default
+""")
+        fd.close()
+
+        p, pkgadd = mkwriter('pkgadd', '-n', '-a', join(tmpdir, 'noask'),
+                             '-d', path)
+        pkgadd.write("all\n")
+        pkgadd.close()
+        if p.wait() != 0:
+            raise Exception("install_pkg failed")
+
+        time.sleep(60)
+
+    def install_ruby(self):
+        if not self.has_package('google-perftools'):
+            try: self.install_pkg(self.perftools_pkg)
+            except: pass
+        if not self.has_package('ruby-enterprise'):
+            self.install_pkg(self.ruby_pkg)
+
+    def install_git(self):
+        self.install_pkg(join(tmpdir, 'solaris', 'git-%s.pkg' % git_version))
+
+    def start_service(self, name):
+        shell('svcadm', 'enable', name)
+
+    def stop_service(self, name):
+        shell('svcadm', 'disable', name)
 
 ##############################################################################
 
@@ -430,6 +554,9 @@ class PuppetCommon(object):
     def install_puppet(self):
         if 'puppet' not in self.machine.installed_gems():
             self.machine.gem_install('puppet')
+
+    def install_git(self):
+        self.machine.install_git()
 
     def bootstrap(self):
         raise Exception("Not implemented")
@@ -489,31 +616,32 @@ class PuppetBootstrap(CommandLineApp):
 
             host.bootstrap()
 
-            shell('service', 'puppet', 'stop')
+            machine.stop_service('puppet')
             if not master:
-                shell('service', 'puppetmaster', 'stop')
+                machine.stop_service('puppetmaster')
                 shutil.rmtree('/etc/puppet/ssl')
-                shell('service', 'puppetmaster', 'start')
+                machine.start_service('puppetmaster')
 
+            time.sleep(60)
             try: shell('puppetd', '--test')
             except: pass
 
             if not master:
                 shell('puppetca', '--sign', '--all')
                 shell('puppetd', '--test')
-                shell('service', 'puppet', 'start')
+                machine.start_service('puppet')
 
                 if not isdir('/etc/puppet/modules'):
-                    shell('rpm', '-Uvh',
-                          'http://repo.webtatic.com/yum/centos/5/latest.rpm')
-                    shell('yum', 'install', '-y', '--enablerepo=webtatic', 'git')
+                    host.install_git()
                     shell('git', 'clone', 'git://github.com/jwiegley/puppet-config',
                           '/etc/puppet/modules')
         else:
             host   = args[0]
             ostype = args[1]
 
-            shell('ssh', host, 'yum', 'install', '-y', 'rsync')
+            if ostype == 'centos':
+                shell('ssh', host, 'yum', 'install', '-y', 'rsync')
+
             shell('rsync', '-av', '--include=/%s/' % ostype, '--exclude=/*/',
                   './', '%s:%s/' % (host, tmpdir))
             shell('ssh', host, 'chmod', 'ugo+rX', tmpdir)

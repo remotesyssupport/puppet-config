@@ -10,12 +10,6 @@ file { "/etc/puppet/puppet.conf":
 }
 
 package { "rails": provider => gem }
-package { "mysql": provider => gem }
-#exec { "install mysql gem":
-#  user    => root,
-#  command => "/usr/bin/gem install --include-dependencies --no-rdoc --no-ri mysql -- --with-mysql-config=/usr/bin/mysql_config",
-#  unless  => "/usr/bin/gem list | /bin/grep -q ^mysql";
-#}
 
 service { mysqld:
   ensure     => running,
@@ -27,21 +21,22 @@ service { mysqld:
 define mysql_database($user, $passwd, $host = "localhost") {
   exec { "create MySQL user $user":
     user        => root,
-    command     => "/usr/bin/mysql -u root -e \"CREATE USER $user@$host IDENTIFIED BY '$passwd';\"",
-    unless      => "/usr/bin/mysql -u root mysql -e \"SELECT user FROM user WHERE user='$user'\" | /bin/grep -q $user",
+    path        => "/usr/bin",
+    command     => "sleep 30; mysql mysql -e \"CREATE USER $user@$host IDENTIFIED BY '$passwd';\"",
+    unless      => "mysql mysql -e \"SELECT user FROM user WHERE user='$user'\" | grep -q $user",
     require     => Service[mysqld];
   }
 
   exec { "create MySQL database $title":
     user        => root,
-    command     => "/usr/bin/mysql -u root -e 'CREATE DATABASE $title'",
-    unless      => "/usr/bin/mysql -u root -e 'SHOW DATABASES' | /bin/grep -q $title",
+    command     => "/usr/bin/mysql -e 'CREATE DATABASE $title'",
+    unless      => "/usr/bin/mysql -e 'SHOW DATABASES' | grep -q $title",
     require     => Exec["create MySQL user $user"];
   }
 
   exec { "grant MySQL user $user":
     user        => root,
-    command     => "/usr/bin/mysql -u root -e \"GRANT ALL PRIVILEGES ON $title.* TO $user@$host IDENTIFIED BY '$passwd'\"",
+    command     => "/usr/bin/mysql -e \"GRANT ALL PRIVILEGES ON $title.* TO $user@$host IDENTIFIED BY '$passwd'\"",
     refreshonly => true,
     subscribe   => Exec["create MySQL database $title"],
     require     => Exec["create MySQL database $title"];
@@ -59,7 +54,8 @@ service { puppetmaster:
   ensure     => running,
   enable     => true,
   hasstatus  => true,
-  hasrestart => true;
+  hasrestart => true,
+  subscribe  => File["/etc/puppet/puppet.conf"];
 }
 
 case $operatingsystem {
@@ -91,9 +87,9 @@ case $operatingsystem {
 
     $packages = [ "mysql-server", "mysql-devel.$architecture" ]
 
-    package { $packages:
-      ensure => installed;
-    }
+    package { $packages: ensure => installed }
+
+    package { "mysql": provider => gem }
 
     # Building the mysql gem requires mysql-devel
     Package["mysql"] {
@@ -101,15 +97,76 @@ case $operatingsystem {
                    Package[$devel_pkgs] ]
     }
 
+    Service[mysqld] {
+      require => Package["mysql-server"]
+    }
+
     Service[puppetmaster] {
       require => [ Package["puppet"], Service[mysqld],
                    File["/etc/init.d/puppetmaster"] ]
     }
+  }
+
+  Solaris: {
+    group { puppet: ensure => present }
+
+    file { "/etc/svc/profile/puppetmaster.xml":
+      owner   => root,
+      group   => root,
+      mode    => 0755,
+      ensure  => present,
+      source  => "/tmp/puppet/solaris/puppetmaster.xml",
+      require => Package[puppet];
+    }
+
+    exec { "install puppetmaster.xml manifest":
+      user    => root,
+      command => "/usr/sbin/svccfg import /etc/svc/profile/puppetmaster.xml",
+      unless  => "/usr/sbin/svccfg list network/puppetmaster | grep -q network/puppetmaster",
+      require => File["/etc/svc/profile/puppetmaster.xml"];
+    }
+
+    Service[puppetmaster] {
+      name    => "network/puppetmaster",
+      require => [ Package["puppet"], Service[mysqld],
+                   Exec["install puppetmaster.xml manifest"] ]
+    }
+
+    $devel_pkgs = [ 'gcc-dev'
+                  , 'library/math/header-math'
+                  ]
+    
+    package { $devel_pkgs:
+      provider => pkg,
+      ensure   => installed;
+    }
+    
+    $packages = [ "mysql-51", "mysql-51/library" ]
+    
+    package { $packages:
+      provider => pkg,
+      ensure   => installed;
+    }
+
+    ## Building the mysql gem requires mysql-devel
+    #package { "mysql": provider => gem }
+    #Package["mysql"] {
+    #  require => [ Package["mysql-51/library"], Package[$devel_pkgs] ]
+    #}
+
+    exec { "manually install mysql gem":
+      user    => root,
+      command => "/usr/bin/gem install mysql -- --with-mysql-dir=/usr/mysql --with-mysql-lib=/usr/mysql/lib --with-mysql-include=/usr/mysql/include",
+      unless  => "/usr/bin/gem list mysql | grep -q ^mysql",
+      require => [ Package["mysql-51/library"], Package[$devel_pkgs] ];
+    }
 
     Service[mysqld] {
-      require => Package["mysql-server"]
+      name    => "database/mysql",
+      require => Exec["manually install mysql gem"]
     }
   }
+
   default: {
     Service[puppetmaster] {
       require => [ Package["puppet"], Service[mysqld] ]

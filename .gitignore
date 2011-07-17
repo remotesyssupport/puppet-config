@@ -1,7 +1,4 @@
 /modules/old/
-/bootstrap/centos/ruby-enterprise-1.8.7-7.el5.x86_64.rpm
-/bootstrap/centos/ruby-enterprise-rubygems-1.5.2-7.el5.x86_64.rpm
-/bootstrap/solaris/google-perftools-1.7.pkg
-/bootstrap/solaris/ruby-enterprise-1.8.7-2011.03.pkg
-/bootstrap/src/ruby-enterprise-1.8.7-2011.03.tar.xz
-/bootstrap/src/rpmreaper.tar.xz
+/bootstrap/centos/*.rpm
+/bootstrap/solaris/*.pkg
+/bootstrap/src/*.tar.xz
